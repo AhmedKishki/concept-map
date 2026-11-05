@@ -2,7 +2,7 @@
 
 Maps a long text from its passages: the phrases it keeps returning to, which of them go together, and where each one appears.
 
-A concept is a phrase from the text, such as "march hare". Concepts that share passages more often than chance are linked, and linked concepts form communities: in *Alice in Wonderland*, "hatter", "march hare", "dormouse" and "time" form one. Each concept and link lists its passages, so it can be checked against the text. A link says only that two concepts go together, not how, so the map is not a knowledge graph.
+A concept is a phrase from the text, such as "march hare". Concepts that share passages more often than chance are linked, and linked concepts form communities: in *Alice in Wonderland*, "hatter", "march hare", "dormouse" and "time" form one. Every concept and link lists the passages it comes from.
 
 ## How it works
 
@@ -18,22 +18,23 @@ A concept is a phrase from the text, such as "march hare". Concepts that share p
 
 ## Its own documentation, mapped
 
-Run on the prose of [docs/concept-map.md](docs/concept-map.md), 118 paragraphs and list items, the crate finds eight communities. They line up with the doc's subjects: the Louvain method, the passage-by-word matrix, the *Alice* examples, graphs, NMF, candidate phrases and information theory, plus one concept without links.
+Run on the prose of [docs/concept-map.md](docs/concept-map.md), 147 paragraphs and list items, the crate finds these communities, one per line. The first four follow the doc's sections on communities, links, phrases and NMF.
 
-- community, concepts, links, stand, number, ties, bound, order, five-node graph, modularity, phase
-- subject, text, step, words, toy text, tokens, stem, cell, column, row
-- march hare, score, hatter, alice, topic, tea, time, dormous
-- graph, joins, sum, weight, node, degrees, gains, joining node
-- holds, error, entry, lee, seung, iteration, ratio, update
-- phrase, cut, digit, letters, run, smart stopwords, content words
-- pair, entropy, average, logarithm, probability, rarer, share
-- measures
+- chance predicts, community, links, weight, joins, stays, degrees, sum, node, phase, gains, joining node
+- concepts, march hare, stands, dormous, hatter, npmi, share, time, alice, scores, pair, bound
+- phrase, step, word, cuts, toy text, stems, tokens, letters, lowercased, drops, run, hold
+- error, entry, lee, seung, iteration, denominator, update, loop stops
+- hare, march, tea, topic, topic holds
+- passage holds, row, cell, column, product
+- text, index, ties, order
+- average
+- logarithm
 
-`cargo run --example docs_map` rebuilds it.
+`cargo run --example docs_map` prints it.
 
 ## Install
 
-The crate is not on crates.io yet, so add it from git. It needs Rust 1.92 or later.
+Add it from git; it needs Rust 1.92 or later.
 
 ```toml
 [dependencies]
@@ -88,7 +89,7 @@ crying and gryphon danced: NPMI 1, passages [0, 4, 8, 12, 16, 20]
 
 ## Input
 
-At least 20 passages of one text, in reading order; the settings were chosen for passages of whole paragraphs of at most 220 words. Raw text needs no preparation, but everything in it counts, so remove notes, an index or licence text that should not be mapped. The stopwords and the stemmer are English, so other languages give poor concepts.
+`build` takes the passages of one text in reading order, at least 20 of them; fewer return an `Error`. The settings were chosen for passages of whole paragraphs of at most 220 words. Pass the text you want mapped, leaving out notes, an index or licence text: `build` splits, lowercases and stems the words itself, and everything it receives counts. It reads English, with English stopword lists and an English stemmer.
 
 ## Output
 
@@ -99,7 +100,7 @@ At least 20 passages of one text, in reading order; the settings were chosen for
 - `communities`, each with its `concepts`, largest first;
 - `passages` and `topics`, the number of each.
 
-A passage's id is its index in your input, and a concept's id its index in `concepts`. `build` fails only on fewer than 20 passages.
+A passage's id is its index in your input, and a concept's id its index in `concepts`.
 
 ## Cost
 
@@ -107,7 +108,7 @@ A passage's id is its index in your input, and a concept's id its index in `conc
 
 ## Similar tools
 
-[VOSviewer](https://www.vosviewer.com/), a desktop application, and [InfraNodus](https://infranodus.com/), a web service, also map a text's terms by co-occurrence and cluster them by modularity, while [GraphRAG](https://arxiv.org/abs/2404.16130) has a language model extract entities and then groups them. This crate is a Rust library with no model of any kind, so the same passages always give the same map, and nothing in it is generated.
+[VOSviewer](https://www.vosviewer.com/), a desktop application, and [InfraNodus](https://infranodus.com/), a web service, map a text's terms by co-occurrence and cluster them by modularity, and [GraphRAG](https://arxiv.org/abs/2404.16130) has a language model extract entities and group them. concept-map does this from the text alone, as a Rust library, and the same passages always give the same map.
 
 ## License
 
