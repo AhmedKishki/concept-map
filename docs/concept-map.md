@@ -450,9 +450,7 @@ A text in which no phrase is a candidate gets an empty graph, with no concepts, 
 - A legend names each community by its number from 1 and its four concepts with most passages, such as "1 · node, community, links, sum".
 - The layout is Graphviz's force-directed `fdp`. Each community of two or more concepts is a cluster without a frame, which keeps its concepts together, and the fixed seed `start=7` makes the same graph give the same picture.
 
-This file, drawn the same way, is the picture below. `examples/docs_map.rs` takes the paragraphs and list items of this file, without its headings, tables, code, formulas and references, builds the graph and prints `to_dot`, and `cargo run --example docs_map | dot -Tpng -Gdpi=110 -o docs/concept-map.png` redraws it. Its communities follow this file's subjects.
-
-![The concept map of this document](concept-map.png)
+[README.md](README.md) in this folder shows this file drawn the same way. `examples/docs_map.rs` takes the paragraphs and list items of this file, without its headings, tables, code, formulas and references, builds the graph and prints `to_dot`, and `cargo run --example docs_map | dot -Tpng -Gdpi=110 -o docs/concept-map.png` redraws it.
 
 ## Why it works this way
 

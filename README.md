@@ -20,15 +20,7 @@ The map of the Project Gutenberg EPUB of *Alice's Adventures in Wonderland*, in 
 4. **Links.** Each concept picks up to three partners with which it shares far more passages than chance predicts, scored by normalized pointwise mutual information (NPMI): 1 for concepts always found together, 0 for chance. Either pick makes a link.
 5. **Communities.** It groups the concepts that link more to each other than to the rest (the Louvain method).
 
-[docs/concept-map.md](docs/concept-map.md) explains each step from the basics.
-
-## Its own documentation, mapped
-
-The map of [docs/concept-map.md](docs/concept-map.md), built from its 157 paragraphs and list items, with a community for each of its subjects: phrases, tokens and stems, the passage-by-word matrix, the *Alice* examples, NPMI, Louvain and NMF.
-
-![The concept map of concept-map's own documentation](docs/concept-map.png)
-
-`cargo run --example docs_map | dot -Tpng -Gdpi=110 -o docs/concept-map.png` redraws it with Graphviz.
+[docs/concept-map.md](docs/concept-map.md) explains each step from the basics, and [docs/README.md](docs/README.md) shows the crate's map of that explanation.
 
 ## Install
 
