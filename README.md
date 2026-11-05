@@ -20,7 +20,7 @@ The map of the Project Gutenberg EPUB of *Alice's Adventures in Wonderland*, in 
 4. **Links.** Each concept picks up to three partners with which it shares far more passages than chance predicts, scored by normalized pointwise mutual information (NPMI): 1 for concepts always found together, 0 for chance. Either pick makes a link.
 5. **Communities.** It groups the concepts that link more to each other than to the rest (the Louvain method).
 
-[docs/concept-map.md](docs/concept-map.md) explains each step from the basics, and [docs/README.md](docs/README.md) shows the crate's map of that explanation.
+[docs/concept-map.md](docs/concept-map.md) explains each step from the basics, and [docs/README.md](docs/README.md) shows the crate's map of that explanation. [docs/usage.md](docs/usage.md) documents every public function and type, with recipes for common tasks.
 
 ## Install
 

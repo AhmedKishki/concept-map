@@ -1,6 +1,6 @@
 # concept-map documentation
 
-[concept-map.md](concept-map.md) explains how concept-map builds a map from a text's passages: how it reads words, the five steps from candidate phrases to communities with the maths behind each, worked examples on *Alice in Wonderland*, how `to_dot` draws the result, and the limits of the method.
+[concept-map.md](concept-map.md) explains how concept-map builds a map from a text's passages: how it reads words, the five steps from candidate phrases to communities with the maths behind each, worked examples on *Alice in Wonderland*, how `to_dot` draws the result, and the limits of the method. [usage.md](usage.md) documents every public function and type of the crate, with recipes for common tasks.
 
 ## This documentation, mapped
 

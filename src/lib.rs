@@ -1,5 +1,15 @@
 //! A book's concept map: the phrases that mark its topics, which of them
 //! share passages more often than chance, and the communities they form.
+//!
+//! [`build`] takes the passages of a text in reading order and returns a
+//! [`GraphResult`], whose [`GraphResult::to_dot`] writes the map for Graphviz
+//! to draw. The [usage reference] documents every public item, with recipes
+//! for common tasks; [concept-map.md] explains how each step works.
+//!
+//! [usage reference]: https://github.com/AhmedKishki/concept-map/blob/main/docs/usage.md
+//! [concept-map.md]: https://github.com/AhmedKishki/concept-map/blob/main/docs/concept-map.md
+
+#![warn(missing_docs)]
 
 mod analysis;
 mod communities;
@@ -91,8 +101,40 @@ impl GraphResult {
     /// colour, sized by its passages and labelled beside it; each link is a
     /// line that grows thicker with its NPMI; and a legend names each
     /// community by its four concepts with most passages. The layout is
-    /// Graphviz's force-directed `fdp` with a fixed seed, so the same map
-    /// gives the same picture.
+    /// Graphviz's force-directed `fdp`, started from the fixed seed
+    /// `start=7`. The same map always gives the same DOT, but Graphviz 2.43
+    /// can still place the concepts differently from one run to the next.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a community lists a concept id that is not an index into
+    /// `concepts`. A map from [`build`] never does; a map edited by hand can.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut texts = [
+    ///     "The Mock Turtle was crying, and the Gryphon danced the Lobster Quadrille.",
+    ///     "The Hatter and the March Hare were having tea with the Dormouse.",
+    ///     "The Queen of Hearts was at the trial of the Knave.",
+    ///     "Alice was down the rabbit hole, in a long hall.",
+    /// ]
+    /// .repeat(5);
+    /// texts.extend([
+    ///     "The Hatter was a witness at the trial.",
+    ///     "At the trial, the Hatter was the first witness.",
+    ///     "The Gryphon took Alice to the Mock Turtle.",
+    ///     "The Mock Turtle was crying.",
+    /// ]);
+    ///
+    /// let dot = concept_map::build(&texts)?.to_dot();
+    /// assert!(dot.starts_with("graph map {\n"));
+    /// // Concept 0, "crying", is the node n0, in the first community's colour.
+    /// assert!(dot.contains(r##"n0 [width=0.329, fillcolor="#f0bf3c", xlabel="crying"];"##));
+    /// // Printed and piped into `dot -Tsvg -o map.svg`, it draws the map.
+    /// print!("{dot}");
+    /// # Ok::<(), concept_map::Error>(())
+    /// ```
     pub fn to_dot(&self) -> String {
         let most = self
             .concepts
@@ -191,8 +233,7 @@ fn html_escape(text: &str) -> String {
         .replace('"', "&quot;")
 }
 
-/// The error `build` returns: the book has fewer than
-/// `GRAPH_MIN_BOOK_PASSAGES` passages.
+/// The error [`build`] returns when the book has fewer than 20 passages.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Error {
     /// How many passages the book has.
@@ -212,6 +253,47 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {}
 
 /// The concept map of a book's passages, which must be in reading order.
+///
+/// A passage's id in the map is its index in `texts`. The settings were
+/// chosen for passages of whole paragraphs of at most 220 words. Every
+/// passage and every word in it counts, so leave out the notes, index or
+/// licence text you do not want mapped. `build` reads English: its stopword
+/// lists and its stemmer are English.
+///
+/// The same passages always give the same map. A phrase becomes a candidate
+/// only when it stands in at least 3 passages and in at most 30% of them, so
+/// a text without such a phrase gets an empty map, with no concepts, links
+/// or communities.
+///
+/// # Errors
+///
+/// Returns [`Error`] when `texts` holds fewer than 20 passages.
+///
+/// # Examples
+///
+/// ```
+/// let mut texts = [
+///     "The Mock Turtle was crying, and the Gryphon danced the Lobster Quadrille.",
+///     "The Hatter and the March Hare were having tea with the Dormouse.",
+///     "The Queen of Hearts was at the trial of the Knave.",
+///     "Alice was down the rabbit hole, in a long hall.",
+/// ]
+/// .repeat(5);
+/// texts.extend([
+///     "The Hatter was a witness at the trial.",
+///     "At the trial, the Hatter was the first witness.",
+///     "The Gryphon took Alice to the Mock Turtle.",
+///     "The Mock Turtle was crying.",
+/// ]);
+///
+/// let map = concept_map::build(&texts)?;
+/// let hatter = map.concepts.iter().find(|c| c.label == "hatter").unwrap();
+/// assert_eq!(hatter.passages, [1, 5, 9, 13, 17, 20, 21]);
+///
+/// // 19 passages are too few.
+/// assert_eq!(concept_map::build(&texts[..19]).unwrap_err().passages, 19);
+/// # Ok::<(), concept_map::Error>(())
+/// ```
 pub fn build(texts: &[&str]) -> Result<GraphResult, Error> {
     let n = texts.len();
     if n < GRAPH_MIN_BOOK_PASSAGES {
@@ -413,6 +495,11 @@ fn mutual_information(occurs: &[u32], topic_of: &[usize], topic_sizes: &[usize])
 #[cfg(doctest)]
 #[doc = include_str!("../README.md")]
 struct ReadmeDoctests;
+
+/// Runs the examples of docs/usage.md as doctests.
+#[cfg(doctest)]
+#[doc = include_str!("../docs/usage.md")]
+struct UsageDoctests;
 
 #[cfg(test)]
 mod tests {
