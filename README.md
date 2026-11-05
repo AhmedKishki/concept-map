@@ -24,11 +24,11 @@ The map of the Project Gutenberg EPUB of *Alice's Adventures in Wonderland*, in 
 
 ## Install
 
-Add it from git; it needs Rust 1.92 or later.
+Add it to `Cargo.toml`; it needs Rust 1.92 or later.
 
 ```toml
 [dependencies]
-concept-map = { git = "https://github.com/AhmedKishki/concept-map" }
+concept-map = "0.1"
 ```
 
 ## Usage

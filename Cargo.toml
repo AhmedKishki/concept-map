@@ -6,6 +6,8 @@ rust-version = "1.92"
 license = "MIT"
 description = "The concepts of a text's passages, their NPMI links and their Louvain communities"
 repository = "https://github.com/AhmedKishki/concept-map"
+keywords = ["concept-map", "keyword-extraction", "npmi", "topic-modeling", "graph"]
+categories = ["text-processing", "algorithms"]
 
 [dependencies]
 frostem = "=1.20260821.8"
