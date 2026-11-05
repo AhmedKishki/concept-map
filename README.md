@@ -2,7 +2,13 @@
 
 Maps a long text from its passages: the phrases it keeps returning to, which of them go together, and where each one appears.
 
-A concept is a phrase from the text, such as "march hare". Concepts that share passages more often than chance are linked, and linked concepts form communities: in *Alice in Wonderland*, "hatter", "march hare", "dormouse" and "time" form one. Every concept and link lists the passages it comes from.
+A concept is a phrase from the text, such as "march hare". Concepts that share passages more often than chance are linked, and linked concepts form communities. Every concept and link lists the passages it comes from.
+
+## Alice in Wonderland, mapped
+
+The map of the Project Gutenberg EPUB of *Alice's Adventures in Wonderland*, in 166 passages. Each colour is a community, a circle grows with its concept's passages, and a line thickens with its NPMI. The trial, the tea party, the Gryphon and the Mock Turtle, and the Caterpillar each gather into a community, and the three communities at the top come from the Project Gutenberg licence that the book carries.
+
+![The concept map of Alice's Adventures in Wonderland](docs/alice.png)
 
 ## How it works
 
@@ -18,7 +24,7 @@ A concept is a phrase from the text, such as "march hare". Concepts that share p
 
 ## Its own documentation, mapped
 
-The map of [docs/concept-map.md](docs/concept-map.md), built from its 147 paragraphs and list items. Each colour is a community, a circle grows with its concept's passages, and a line thickens with its NPMI.
+The map of [docs/concept-map.md](docs/concept-map.md), built from its 157 paragraphs and list items, with a community for each of its subjects: phrases, tokens and stems, the passage-by-word matrix, the *Alice* examples, NPMI, Louvain and NMF.
 
 ![The concept map of concept-map's own documentation](docs/concept-map.png)
 

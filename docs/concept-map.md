@@ -27,6 +27,10 @@ Below, n is the number of passages. `build` refuses fewer than `GRAPH_MIN_BOOK_P
 
 The worked examples use the Project Gutenberg EPUB of Lewis Carroll's *Alice's Adventures in Wonderland*, cut into 166 passages of whole paragraphs of at most 220 words, with the chapter headings left out. Steps 2 and 3 add a toy text of six passages, small enough to show every number.
 
+The whole graph of *Alice*, drawn by `to_dot` as [Drawing the map](#drawing-the-map) describes, holds the concepts, links and communities that the examples below take apart. Each colour is a community, a circle grows with its concept's passages, and a line thickens with its NPMI. The trial, the tea party, the Gryphon and the Mock Turtle, and the Caterpillar each gather into a community, and the three communities at the top come from the Project Gutenberg licence that the book carries, as [Limits](#limits) explains.
+
+![The concept map of Alice's Adventures in Wonderland](alice.png)
+
 ### One phrase through the five steps
 
 The phrase "march hare" shows what each step contributes before the sections below explain how.
@@ -446,7 +450,9 @@ A text in which no phrase is a candidate gets an empty graph, with no concepts, 
 - A legend names each community by its number from 1 and its four concepts with most passages, such as "1 · node, community, links, sum".
 - The layout is Graphviz's force-directed `fdp`. Each community of two or more concepts is a cluster without a frame, which keeps its concepts together, and the fixed seed `start=7` makes the same graph give the same picture.
 
-The README's picture is this crate's documentation drawn this way: `examples/docs_map.rs` takes the paragraphs and list items of this file, without its headings, tables, code, formulas and references, builds the graph and prints `to_dot`.
+This file, drawn the same way, is the picture below. `examples/docs_map.rs` takes the paragraphs and list items of this file, without its headings, tables, code, formulas and references, builds the graph and prints `to_dot`, and `cargo run --example docs_map | dot -Tpng -Gdpi=110 -o docs/concept-map.png` redraws it. Its communities follow this file's subjects.
+
+![The concept map of this document](concept-map.png)
 
 ## Why it works this way
 
