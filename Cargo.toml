@@ -1,0 +1,12 @@
+[package]
+name = "concept-graph"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.92"
+license = "MIT"
+description = "The concepts of a text's passages, their NPMI links and their Louvain communities"
+repository = "https://github.com/AhmedKishki/concept-graph"
+
+[dependencies]
+frostem = "=1.20260821.8"
+serde = { version = "1", features = ["derive"] }
