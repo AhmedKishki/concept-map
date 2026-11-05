@@ -2,7 +2,7 @@
 
 Builds a map of a long text from its passages: the phrases it keeps returning to, which of them go together, and where each one appears.
 
-A concept is a phrase from the text, such as "march hare" or "transcendental realism". Two concepts are linked when they share passages more often than chance predicts, and linked concepts form communities: in *Alice in Wonderland*, "hatter", "march hare", "dormouse" and "time" form one, while "king", "queen", "jury" and "trial" belong to another. Every concept and every link lists its passages, so you can read the text behind it. The crate needs no model or training data.
+A concept is a phrase from the text, such as "march hare" or "transcendental realism". Two concepts are linked when they share passages more often than chance predicts, and linked concepts form communities: in *Alice in Wonderland*, "hatter", "march hare", "dormouse" and "time" form one, while "king", "queen", "jury" and "trial" belong to another. Every concept and every link lists its passages, so you can read the text behind it.
 
 ## How it works
 
@@ -88,11 +88,20 @@ crying and gryphon danced: NPMI 1, passages [0, 4, 8, 12, 16, 20]
 - `communities`, each with its `concepts`, the largest community first;
 - `passages` and `topics`, the number of passages and of topics.
 
-Ids are indexes: a passage's id is its index in your input, and a concept's id is its index in `concepts`. The same input always gives the same graph. `build` fails only when there are fewer than 20 passages.
+Ids are indexes: a passage's id is its index in your input, and a concept's id is its index in `concepts`. `build` fails only when there are fewer than 20 passages.
 
 ## Cost
 
 `build` runs on one thread. On an Intel Core Ultra 7 255H it took 0.07 s for 166 passages, 0.42 s for 650 and 4.3 s for 2,402, and the largest peaked at 41 MB.
+
+## Similar tools
+
+Maps of terms built from co-occurrence are an established idea. [VOSviewer](https://www.vosviewer.com/) maps the noun phrases of a set of documents and clusters them by modularity, [InfraNodus](https://infranodus.com/) builds a network of a text's words and finds its topics with the Louvain method, and [GraphRAG](https://arxiv.org/abs/2404.16130) has a language model extract entities before it groups them into communities. This crate makes different trade-offs:
+
+- It needs no model, language model or training data, and it runs as a Rust library inside your program.
+- It is deterministic: the same passages always give the same graph.
+- Its concepts are phrases from the text and its links rest on counted passages, so nothing in the graph is generated.
+- It keeps the phrases that best tell the text's topics apart, so a phrase that is merely frequent does not become a concept.
 
 ## License
 
