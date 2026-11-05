@@ -87,7 +87,7 @@ const OTHER_COLOUR: &str = "#8a93a6";
 
 impl GraphResult {
     /// The map in Graphviz's DOT language, which `dot -Tsvg` or `dot -Tpng`
-    /// draws on a dark ground. Each concept is a circle in its community's
+    /// draws on a white ground. Each concept is a circle in its community's
     /// colour, sized by its passages and labelled beside it; each link is a
     /// line that grows thicker with its NPMI; and a legend names each
     /// community by its four concepts with most passages. The layout is
@@ -104,10 +104,10 @@ impl GraphResult {
         let mut dot = String::from(concat!(
             "graph map {\n",
             "  graph [layout=fdp, overlap=false, splines=true, sep=\"+12\", K=1.1, ",
-            "maxiter=2000, start=7, forcelabels=true, bgcolor=\"#0a1226\", pad=0.4];\n",
+            "maxiter=2000, start=7, forcelabels=true, bgcolor=\"#ffffff\", pad=0.4];\n",
             "  node [shape=circle, style=filled, fixedsize=true, label=\"\", color=\"#0f1b33\", ",
-            "penwidth=1.5, fontname=\"Georgia\", fontsize=13, fontcolor=\"#f3ead0\"];\n",
-            "  edge [color=\"#f3ead040\"];\n",
+            "penwidth=1.2, fontname=\"Georgia\", fontsize=13, fontcolor=\"#0a1226\"];\n",
+            "  edge [color=\"#0a122659\"];\n",
         ));
         for community in &self.communities {
             // A frameless cluster keeps a community together in the layout.
@@ -146,7 +146,7 @@ impl GraphResult {
                 let _ = writeln!(
                     dot,
                     "<TR><TD BGCOLOR=\"{}\" WIDTH=\"12\" HEIGHT=\"12\" FIXEDSIZE=\"TRUE\"></TD>\
-                     <TD ALIGN=\"LEFT\"><FONT COLOR=\"#f3ead0\">{}</FONT></TD></TR>",
+                     <TD ALIGN=\"LEFT\"><FONT COLOR=\"#0a1226\">{}</FONT></TD></TR>",
                     community_colour(community.id),
                     html_escape(&self.community_label(community))
                 );
