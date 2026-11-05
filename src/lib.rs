@@ -1,4 +1,4 @@
-//! A book's concept graph: the phrases that mark its topics, which of them
+//! A book's concept map: the phrases that mark its topics, which of them
 //! share passages more often than chance, and the communities they form.
 
 mod analysis;
@@ -21,7 +21,7 @@ const GRAPH_NPMI_FLOOR: f64 = 0.1;
 const GRAPH_MIN_SHARED: usize = 2;
 const GRAPH_MIN_BOOK_PASSAGES: usize = 20;
 
-/// A book's concept graph.
+/// A book's concept map.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GraphResult {
     /// How many passages the book has.
@@ -91,7 +91,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "the book has {} passages; a concept graph needs at least {GRAPH_MIN_BOOK_PASSAGES}",
+            "the book has {} passages; a concept map needs at least {GRAPH_MIN_BOOK_PASSAGES}",
             self.passages
         )
     }
@@ -99,7 +99,7 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-/// The concept graph of a book's passages, which must be in reading order.
+/// The concept map of a book's passages, which must be in reading order.
 pub fn build(texts: &[&str]) -> Result<GraphResult, Error> {
     let n = texts.len();
     if n < GRAPH_MIN_BOOK_PASSAGES {
@@ -316,7 +316,7 @@ mod tests {
     fn a_book_shorter_than_twenty_passages_is_refused() {
         let error = build(&["one passage"; 19]).unwrap_err().to_string();
         assert!(
-            error.contains("the book has 19 passages; a concept graph needs at least 20"),
+            error.contains("the book has 19 passages; a concept map needs at least 20"),
             "{error}"
         );
     }

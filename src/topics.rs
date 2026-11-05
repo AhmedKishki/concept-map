@@ -1,4 +1,4 @@
-//! Step 2 of the concept graph: the passages divided into topics by
+//! Step 2 of the concept map: the passages divided into topics by
 //! non-negative matrix factorization (NMF) of their TF-IDF weights.
 
 use std::collections::{BTreeMap, HashMap};

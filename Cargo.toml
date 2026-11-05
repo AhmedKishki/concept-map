@@ -1,11 +1,11 @@
 [package]
-name = "concept-graph"
+name = "concept-map"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.92"
 license = "MIT"
 description = "The concepts of a text's passages, their NPMI links and their Louvain communities"
-repository = "https://github.com/AhmedKishki/concept-graph"
+repository = "https://github.com/AhmedKishki/concept-map"
 
 [dependencies]
 frostem = "=1.20260821.8"

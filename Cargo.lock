@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "concept-graph"
+name = "concept-map"
 version = "0.1.0"
 dependencies = [
  "frostem",

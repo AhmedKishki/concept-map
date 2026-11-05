@@ -1,4 +1,4 @@
-//! Step 5 of the concept graph: communities of linked concepts, by the
+//! Step 5 of the concept map: communities of linked concepts, by the
 //! Louvain method (Blondel, Guillaume, Lambiotte and Lefebvre, 2008).
 
 /// A node moves to another community only if modularity rises by more than

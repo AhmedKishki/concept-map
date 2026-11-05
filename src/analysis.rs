@@ -1,4 +1,4 @@
-//! The two analyzers the concept graph reads words with. Each gives, token for
+//! The two analyzers the concept map reads words with. Each gives, token for
 //! token, what tantivy 0.27 gives for the same pipeline of `SimpleTokenizer`,
 //! `RemoveLongFilter`, `LowerCaser`, `StopWordFilter` and English `Stemmer`.
 
@@ -32,7 +32,7 @@ pub enum Analyzer {
 pub const STEMMED: Analyzer = Analyzer::Stemmed;
 
 /// Lowercased, English-stemmed tokens with nothing dropped. It keys the
-/// phrases of the concept graph.
+/// phrases of the concept map.
 const KEY: Analyzer = Analyzer::Key;
 
 /// A token as the analyzer emits it. The graph reads only its text.

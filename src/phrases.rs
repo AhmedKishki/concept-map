@@ -1,4 +1,4 @@
-//! Step 1 of the concept graph: candidate phrases, found by RAKE (Rose and
+//! Step 1 of the concept map: candidate phrases, found by RAKE (Rose and
 //! others, 2010) as the runs of words between stopwords and punctuation.
 
 use std::collections::{HashMap, HashSet};
