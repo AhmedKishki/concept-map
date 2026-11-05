@@ -18,19 +18,11 @@ A concept is a phrase from the text, such as "march hare". Concepts that share p
 
 ## Its own documentation, mapped
 
-Run on the prose of [docs/concept-map.md](docs/concept-map.md), 147 paragraphs and list items, the crate finds these communities, one per line. The first four follow the doc's sections on communities, links, phrases and NMF.
+The map of [docs/concept-map.md](docs/concept-map.md), built from its 147 paragraphs and list items. Each colour is a community, a circle grows with its concept's passages, and a line thickens with its NPMI.
 
-- chance predicts, community, links, weight, joins, stays, degrees, sum, node, phase, gains, joining node
-- concepts, march hare, stands, dormous, hatter, npmi, share, time, alice, scores, pair, bound
-- phrase, step, word, cuts, toy text, stems, tokens, letters, lowercased, drops, run, hold
-- error, entry, lee, seung, iteration, denominator, update, loop stops
-- hare, march, tea, topic, topic holds
-- passage holds, row, cell, column, product
-- text, index, ties, order
-- average
-- logarithm
+![The concept map of concept-map's own documentation](docs/concept-map.png)
 
-`cargo run --example docs_map` prints it.
+`cargo run --example docs_map | dot -Tpng -Gdpi=110 -o docs/concept-map.png` redraws it with Graphviz.
 
 ## Install
 
@@ -100,7 +92,7 @@ crying and gryphon danced: NPMI 1, passages [0, 4, 8, 12, 16, 20]
 - `communities`, each with its `concepts`, largest first;
 - `passages` and `topics`, the number of each.
 
-A passage's id is its index in your input, and a concept's id its index in `concepts`.
+A passage's id is its index in your input, and a concept's id its index in `concepts`. `map.to_dot()` writes the map in Graphviz's DOT language, which `dot -Tpng` or `dot -Tsvg` draws as in the picture above.
 
 ## Cost
 

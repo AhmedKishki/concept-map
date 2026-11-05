@@ -7,7 +7,7 @@ mod phrases;
 mod topics;
 
 use std::collections::BTreeSet;
-use std::fmt;
+use std::fmt::{self, Write};
 
 use serde::{Deserialize, Serialize};
 
@@ -77,6 +77,118 @@ pub struct Community {
     pub id: u32,
     /// Its concepts' ids, ascending.
     pub concepts: Vec<u32>,
+}
+
+/// One colour per community, in order; the communities past these are grey.
+const COMMUNITY_COLOURS: [&str; 8] = [
+    "#f0bf3c", "#43e6cb", "#e8798a", "#8fb8ff", "#b9e46a", "#d39bff", "#ff9f5a", "#7fd6f0",
+];
+const OTHER_COLOUR: &str = "#8a93a6";
+
+impl GraphResult {
+    /// The map in Graphviz's DOT language, which `dot -Tsvg` or `dot -Tpng`
+    /// draws on a dark ground. Each concept is a circle in its community's
+    /// colour, sized by its passages and labelled beside it; each link is a
+    /// line that grows thicker with its NPMI; and a legend names each
+    /// community by its four concepts with most passages. The layout is
+    /// Graphviz's force-directed `fdp` with a fixed seed, so the same map
+    /// gives the same picture.
+    pub fn to_dot(&self) -> String {
+        let most = self
+            .concepts
+            .iter()
+            .map(|c| c.passage_count)
+            .max()
+            .unwrap_or(1)
+            .max(1);
+        let mut dot = String::from(concat!(
+            "graph map {\n",
+            "  graph [layout=fdp, overlap=false, splines=true, sep=\"+12\", K=1.1, ",
+            "maxiter=2000, start=7, forcelabels=true, bgcolor=\"#0a1226\", pad=0.4];\n",
+            "  node [shape=circle, style=filled, fixedsize=true, label=\"\", color=\"#0f1b33\", ",
+            "penwidth=1.5, fontname=\"Georgia\", fontsize=13, fontcolor=\"#f3ead0\"];\n",
+            "  edge [color=\"#f3ead040\"];\n",
+        ));
+        for community in &self.communities {
+            // A frameless cluster keeps a community together in the layout.
+            let grouped = community.concepts.len() > 1;
+            if grouped {
+                let _ = writeln!(dot, "  subgraph cluster_{} {{ peripheries=0;", community.id);
+            }
+            for &id in &community.concepts {
+                let concept = &self.concepts[id as usize];
+                // A radius of 3.75 to 12.5 points, by the square root of the
+                // concept's passages as a share of the most any concept has.
+                let share = f64::from(concept.passage_count) / f64::from(most);
+                let radius = 1.25 * (3.0 + 7.0 * share.sqrt());
+                let _ = writeln!(
+                    dot,
+                    "    n{id} [width={:.3}, fillcolor=\"{}\", xlabel=\"{}\"];",
+                    2.0 * radius / 72.0,
+                    community_colour(concept.community),
+                    dot_escape(&concept.label)
+                );
+            }
+            if grouped {
+                dot.push_str("  }\n");
+            }
+        }
+        for link in &self.links {
+            let width = 1.25 * (0.8 + 2.4 * f64::from(link.npmi));
+            let _ = writeln!(dot, "  n{} -- n{} [penwidth={width:.2}];", link.a, link.b);
+        }
+        if !self.communities.is_empty() {
+            dot.push_str(concat!(
+                "  legend [shape=plaintext, style=\"\", fixedsize=false, ",
+                "label=<<TABLE BORDER=\"0\" CELLSPACING=\"6\">\n"
+            ));
+            for community in &self.communities {
+                let _ = writeln!(
+                    dot,
+                    "<TR><TD BGCOLOR=\"{}\" WIDTH=\"12\" HEIGHT=\"12\" FIXEDSIZE=\"TRUE\"></TD>\
+                     <TD ALIGN=\"LEFT\"><FONT COLOR=\"#f3ead0\">{}</FONT></TD></TR>",
+                    community_colour(community.id),
+                    html_escape(&self.community_label(community))
+                );
+            }
+            dot.push_str("</TABLE>>];\n");
+        }
+        dot.push_str("}\n");
+        dot
+    }
+
+    /// `1 · queen, court, king, jury`: a community by its number from 1 and
+    /// its four concepts with most passages.
+    fn community_label(&self, community: &Community) -> String {
+        let mut members: Vec<&Concept> = community
+            .concepts
+            .iter()
+            .map(|&id| &self.concepts[id as usize])
+            .collect();
+        members.sort_by_key(|c| std::cmp::Reverse(c.passage_count));
+        let top: Vec<&str> = members.iter().take(4).map(|c| c.label.as_str()).collect();
+        format!("{} · {}", community.id + 1, top.join(", "))
+    }
+}
+
+fn community_colour(community: u32) -> &'static str {
+    COMMUNITY_COLOURS
+        .get(community as usize)
+        .copied()
+        .unwrap_or(OTHER_COLOUR)
+}
+
+/// `text` inside a DOT string.
+fn dot_escape(text: &str) -> String {
+    text.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+/// `text` inside a DOT HTML label.
+fn html_escape(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 /// The error `build` returns: the book has fewer than
@@ -310,6 +422,61 @@ mod tests {
     fn npmi_is_one_for_phrases_always_together_and_zero_for_chance() {
         assert!((npmi(2, 2, 2, 10) - 1.0).abs() < 1e-12);
         assert!(npmi(4, 5, 2, 10).abs() < 1e-12);
+    }
+
+    #[test]
+    fn to_dot_boxes_communities_and_draws_each_link() {
+        let concept = |id: u32, label: &str, community: u32| Concept {
+            id,
+            label: label.to_string(),
+            passage_count: 2,
+            passages: vec![0, 1],
+            community,
+        };
+        let link = |a: u32, b: u32, npmi: f32| Link {
+            a,
+            b,
+            npmi,
+            passage_count: 2,
+            passages: vec![0, 1],
+        };
+        let map = GraphResult {
+            passages: 20,
+            topics: 2,
+            concepts: vec![
+                concept(0, "march hare", 0),
+                concept(1, "hatter", 0),
+                concept(2, "say \"tea\"", 1),
+            ],
+            links: vec![link(0, 1, 0.9), link(1, 2, 0.3)],
+            communities: vec![
+                Community {
+                    id: 0,
+                    concepts: vec![0, 1],
+                },
+                Community {
+                    id: 1,
+                    concepts: vec![2],
+                },
+            ],
+        };
+
+        let dot = map.to_dot();
+        assert!(dot.starts_with("graph map {\n") && dot.ends_with("}\n"));
+        // Only the community of two concepts is grouped.
+        assert_eq!(dot.matches("subgraph cluster_").count(), 1);
+        assert!(
+            dot.contains(r##"n0 [width=0.347, fillcolor="#f0bf3c", xlabel="march hare"];"##),
+            "{dot}"
+        );
+        assert!(
+            dot.contains(r##"n2 [width=0.347, fillcolor="#43e6cb", xlabel="say \"tea\""];"##),
+            "{dot}"
+        );
+        assert!(dot.contains("n0 -- n1 [penwidth=3.70];"), "{dot}");
+        assert!(dot.contains("n1 -- n2 [penwidth=1.90];"), "{dot}");
+        assert!(dot.contains("1 · march hare, hatter"), "{dot}");
+        assert!(dot.contains("2 · say &quot;tea&quot;"), "{dot}");
     }
 
     #[test]

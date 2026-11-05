@@ -436,6 +436,18 @@ Concepts come in the order the text first mentions them, links sorted by `a` and
 
 A text in which no phrase is a candidate gets an empty graph, with no concepts, links or communities.
 
+### Drawing the map
+
+`GraphResult::to_dot` writes the graph in the DOT language of Graphviz, so that `dot -Tpng` or `dot -Tsvg` can draw it:
+
+- Each concept is a circle in its community's colour, labelled beside it. The first eight communities take the colours `#f0bf3c`, `#43e6cb`, `#e8798a`, `#8fb8ff`, `#b9e46a`, `#d39bff`, `#ff9f5a` and `#7fd6f0` in turn, and any later community is grey.
+- A circle's radius runs from 3.75 to 12.5 points by the square root of its concept's `passage_count` as a share of the largest, so a concept in more passages gets a larger circle.
+- Each link is a line of width 1.25 × (0.8 + 2.4 × NPMI), so a pair that always stands together is drawn about three times as thick as one at the floor of 0.1.
+- A legend names each community by its number from 1 and its four concepts with most passages, such as "1 · node, community, links, sum".
+- The layout is Graphviz's force-directed `fdp`. Each community of two or more concepts is a cluster without a frame, which keeps its concepts together, and the fixed seed `start=7` makes the same graph give the same picture.
+
+The README's picture is this crate's documentation drawn this way: `examples/docs_map.rs` takes the paragraphs and list items of this file, without its headings, tables, code, formulas and references, builds the graph and prints `to_dot`.
+
 ## Why it works this way
 
 Phrases. A concept is named in the text's own words and backed by the passages that hold them, so every concept can be checked by reading. Cutting at stopwords and punctuation keeps a multi-word name such as "march hare" or "mock turtle" whole without a parser or a model. Stemmed keys gather the inflected forms of a phrase under one concept.

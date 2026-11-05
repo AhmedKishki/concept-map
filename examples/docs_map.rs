@@ -1,5 +1,6 @@
-//! Maps this crate's documentation, as the README shows:
-//! `cargo run --example docs_map`.
+//! Maps this crate's documentation and prints the map in Graphviz's DOT
+//! language. The README's picture is drawn with
+//! `cargo run --example docs_map | dot -Tpng -Gdpi=110 -o docs/concept-map.png`.
 //!
 //! The passages are the paragraphs and list items before the references.
 //! Headings, tables, code, formulas and link targets are left out, because
@@ -13,14 +14,7 @@ fn main() {
     let passages = prose(&doc);
     let texts: Vec<&str> = passages.iter().map(String::as_str).collect();
     let map = concept_map::build(&texts).expect("the file has at least 20 passages");
-    for community in &map.communities {
-        let labels: Vec<&str> = community
-            .concepts
-            .iter()
-            .map(|&id| map.concepts[id as usize].label.as_str())
-            .collect();
-        println!("- {}", labels.join(", "));
-    }
+    print!("{}", map.to_dot());
 }
 
 /// The paragraphs and list items of `doc` before its references.
