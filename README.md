@@ -14,7 +14,7 @@
 
 ## Adding it
 
-The crate is not on crates.io. Add it as a git dependency:
+The crate is not on crates.io, so add it as a git dependency:
 
 ```toml
 [dependencies]
@@ -111,7 +111,7 @@ crying and gryphon danced: NPMI 1, passages [0, 4, 8, 12, 16, 20]
 | `id` | its index in `communities` |
 | `concepts` | its concepts' ids, ascending |
 
-A concept stands in a passage only as a run of its own: "turtle" inside "mock turtle" does not count for a concept "turtle". A text in which no phrase stands in at least 3 passages and in at most 30% of them has no concepts, and `build` returns an empty graph for it.
+A concept stands in a passage only as a run of its own: "turtle" inside "mock turtle" does not count for a concept "turtle". A text in which no phrase stands in at least 3 passages and in at most 30% of them has no concepts, so `build` returns an empty graph for it.
 
 The same passages always give the same graph: NMF starts from a fixed seed, and every sort breaks its ties.
 
@@ -121,7 +121,7 @@ The same passages always give the same graph: NMF starts from a fixed seed, and 
 
 ## Constants
 
-The constants are fixed in the source; no argument changes them.
+The constants are fixed in the source, so no argument changes them.
 
 | Constant | Value | Meaning |
 |---|---|---|
@@ -142,11 +142,11 @@ The constants are fixed in the source; no argument changes them.
 
 ## Language
 
-The analysis is for English only. Phrases are cut at the 571 SMART stopwords. The topics leave out Lucene's 33 English stopwords and nine question words. Both stem with the English Snowball stemmer of `frostem`, pinned to version 1.20260821.8 so that stems never change. Text in another language is still read, as words are runs of Unicode letters, but its stopwords do not cut phrases and its inflections are not merged, so its concepts are poor.
+The analysis is for English only. Phrases are cut at the 571 SMART stopwords. The topics leave out Lucene's 33 English stopwords and nine question words. Both stem with the English Snowball stemmer of `frostem`, pinned to version 1.20260821.8 so that stems never change. Text in another language is still read, as words are runs of Unicode letters. But its stopwords do not cut phrases and its inflections are not merged, so its concepts are poor.
 
 ## Cost
 
-`build` runs on one thread, and its time goes mostly to NMF. An NMF iteration costs about z·k + (n + v)·k² operations for z non-zero cells, v words and k ≈ √n topics, and NMF stops after 500 iterations at most. Links compare every pair of the at most 60 concepts. Memory holds the sparse TF-IDF matrix and the two dense factors, n × k and v × k.
+`build` runs on one thread. Its time goes mostly to NMF: an NMF iteration costs about z·k + (n + v)·k² operations for z non-zero cells, v words and k ≈ √n topics, and NMF stops after 500 iterations at most. Links compare every pair of the at most 60 concepts. Memory holds the sparse TF-IDF matrix and the two dense factors, n × k and v × k.
 
 Measured in a release build on an Intel Core Ultra 7 255H:
 

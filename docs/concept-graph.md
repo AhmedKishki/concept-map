@@ -1,10 +1,10 @@
 # The concept graph
 
-The concept graph shows which subjects a text keeps returning to and which of them it treats together. A concept is a phrase from the text, such as "march hare" or "transcendental realism". Two concepts are linked when they stand in the same passages more often than chance predicts, and linked concepts fall into communities. Every concept and every link carries the ids of its passages, so each one can be checked against the text.
+The concept graph maps a text before you know what to search for in it: which subjects the text keeps returning to, which of them it treats together, and where in the text each one appears. It is built from the text's passages alone, without an outline, a model or training data, in seconds.
 
-The graph gives a map of a text before you know what to search for: its recurring subjects, which of them go together, and where in the text each one appears. It is built from the passages alone, without an outline, a model or training data, and takes seconds.
+A concept is a phrase from the text, such as "march hare" or "transcendental realism". Two concepts are linked when they stand in the same passages more often than chance predicts. Linked concepts fall into communities. Every concept and every link carries the ids of its passages, so each one can be checked against the text.
 
-This document explains what `build` computes and why. Each step rests on an idea from text mining, linear algebra, information theory or graph theory. The document explains that idea first, as far as the code needs it, and then works the step through a small example. The [references](#references) say where to read further on each idea.
+This document explains what `build` computes and why. Each step of `build` rests on an idea from text mining, linear algebra, information theory or graph theory, so the document explains that idea first, as far as the code needs it, and then works the step through a small example. The [references](#references) say where to read further on each idea.
 
 ## Overview
 
@@ -21,7 +21,7 @@ flowchart TD
     M --> G["GraphResult"]
 ```
 
-`build` takes the caller's passages as a slice of texts in reading order, and a passage's id is its index in that slice. A passage is the unit of co-occurrence. Two concepts occur together when both stand in one passage, wherever they are inside it. The constants were chosen for passages of whole paragraphs of at most 220 words.
+`build` takes the caller's passages as a slice of texts in reading order. A passage's id is its index in that slice. A passage is the unit of co-occurrence. Two concepts occur together when both stand in one passage, wherever they are inside it. The constants were chosen for passages of whole paragraphs of at most 220 words.
 
 Below, n is the number of passages. `build` refuses fewer than `GRAPH_MIN_BOOK_PASSAGES` = 20 passages, with an error such as "the book has 19 passages; a concept graph needs at least 20".
 
@@ -33,8 +33,8 @@ The phrase "march hare" shows what each step contributes before the sections bel
 
 1. **Candidate phrases.** In "“Have some wine,” the March Hare said in an encouraging tone.", the words "the" and "said" are stopwords, so step 1 cuts "march hare" out of the sentence as a phrase. It stands as a phrase of its own in 17 of the 166 passages, often enough to recur and rarely enough to mark one part of the book, so it is one of 581 candidates.
 2. **Topics.** Independently of step 1, step 2 sorts the 166 passages into 13 topics by the words they use. One topic holds 13 passages whose heaviest words are the stems "hatter", "dormous", "march", "hare" and "tea": the tea party.
-3. **Concepts.** 12 of the 17 passages of "march hare" lie in that topic, so whether a passage holds the phrase and which topic it is in go together. Measured by their mutual information, "march hare" ranks 8th of the 581 candidates and is one of the 60 concepts.
-4. **Links.** "march hare" and "hatter" share 16 passages, where chance predicts fewer than 2. Their NPMI is 0.924, and they are linked.
+3. **Concepts.** 12 of the 17 passages of "march hare" lie in that topic, so whether a passage holds the phrase and which topic it is in go together. Measured by their mutual information, "march hare" ranks 8th of the 581 candidates, so it is one of the 60 concepts.
+4. **Links.** "march hare" and "hatter" share 16 passages, where chance predicts fewer than 2. Their NPMI is 0.924, so they are linked.
 5. **Communities.** The links among "time", "hatter", "march hare" and "dormouse" carry more weight than the four concepts' links to the rest predict, so they form a community.
 
 ## Words, tokens and stems
@@ -47,7 +47,7 @@ A **token** is a piece of text treated as one word. `src/analysis.rs` cuts the t
 
 **Stopwords** are words such as "the", "of" and "said" that occur in passages on every subject. A stopword list names them so that a program can drop them or, in step 1, cut phrases at them. The crate uses two lists: Lucene's 33 English stopwords for step 2 and the SMART system's 571 for step 1.
 
-**Stemming** maps the inflected forms of a word to one stem by removing suffixes. A stemmer applies an ordered list of suffix rules, many of them allowed only when enough of the word remains (Porter 1980). The crate uses the English Snowball stemmer, a revision of Porter's, from the `frostem` crate, which `Cargo.toml` pins to version 1.20260821.8 so that a stem never changes under a graph. It gives, for example:
+**Stemming** maps the inflected forms of a word to one stem by removing suffixes. A stemmer applies an ordered list of suffix rules, many of them allowed only when enough of the word remains (Porter 1980). The crate uses the English Snowball stemmer, a revision of Porter's, from the `frostem` crate. `Cargo.toml` pins `frostem` to version 1.20260821.8 so that the stems a graph is built from never change. The stemmer gives, for example:
 
 | Words | Stem |
 |---|---|
@@ -96,15 +96,15 @@ Three sentences from *Alice* show the rules at work:
 | “Suppose we change the subject,” the March Hare interrupted, yawning. | suppose · change · subject · march hare interrupted · yawning |
 | “It was the best butter,” the March Hare meekly replied. | butter |
 
-"have", "some", "said", "we", "it", "was", "best", "the", "in" and "an" are SMART stopwords. In the second sentence nothing cuts between "Hare" and "interrupted", so the run is the three words "march hare interrupted", a phrase different from "march hare". In the third, "march hare meekly replied" is a run of four content words and gives nothing. The unit tests pin more examples. "The transcendental realism of science, in 1975, rejects positivism." gives "transcendental realism", "science" and "rejects positivism". "Kant’s critique doesn't answer Hume's problem" gives "kant critique" and "answer hume problem". "red green blue yellow" gives nothing.
+"have", "some", "said", "we", "it", "was", "best", "the", "in" and "an" are SMART stopwords. In the second sentence nothing cuts between "Hare" and "interrupted", so the run is the three words "march hare interrupted", a phrase different from "march hare". In the third, "march hare meekly replied" is a run of four content words, so it gives nothing. The unit tests pin more examples. "The transcendental realism of science, in 1975, rejects positivism." gives "transcendental realism", "science" and "rejects positivism". "Kant’s critique doesn't answer Hume's problem" gives "kant critique" and "answer hume problem". "red green blue yellow" gives nothing.
 
 A phrase is keyed by its words stemmed with the `KEY` pipeline and joined by spaces, so "encouraging tone" has the key "encourag tone", and "head" and "heads" share a key. Its label is the lowercased form it most often has, ties going to the form seen first.
 
-A phrase becomes a candidate when it stands in at least `GRAPH_CANDIDATE_MIN_PASSAGES` = 3 passages, so that it recurs, and in at most `GRAPH_CANDIDATE_MAX_SHARE` = 0.3 of them, so that it can still tell the parts of the text apart. Both limits count passages, not occurrences. In the unit test with 10 passages, "mock turtle" stands in 3 and is kept, "gryphon" stands in 2 and is too rare, and "queen" stands in 4 and is too common. *Alice* has 2,716 distinct phrases, and 581 of them become candidates. The upper limit there is 0.3 × 166 = 49.8 passages, so "alice", which stands alone in 105, is not a candidate.
+A phrase becomes a candidate when it stands in at least `GRAPH_CANDIDATE_MIN_PASSAGES` = 3 passages, so that it recurs, and in at most `GRAPH_CANDIDATE_MAX_SHARE` = 0.3 of them, so that it can still tell the parts of the text apart. Both limits count passages, not occurrences. In the unit test with 10 passages, "mock turtle" stands in 3 and is kept, "gryphon" stands in 2 and is too rare, and "queen" stands in 4 and is too common. Of the 2,716 distinct phrases in *Alice*, 581 become candidates. The upper limit there is 0.3 × 166 = 49.8 passages, so "alice", which stands alone in 105, is not a candidate.
 
 A phrase stands in a passage only as a run of its own. "turtle" inside "mock turtle" does not count for a phrase "turtle", and the sentence about the interrupting March Hare does not count for "march hare". A search for a concept's words can therefore find more passages than the concept has.
 
-RAKE goes on to score each candidate by the degree and frequency of its words. This crate takes only RAKE's way of cutting candidates and chooses among them in step 3.
+RAKE goes on to score each candidate by the degree and frequency of its words. This crate takes only RAKE's way of cutting candidates; step 3 chooses among them instead.
 
 ## Step 2: topics
 
@@ -116,7 +116,7 @@ Step 2 reads the passages' words, not the candidates of step 1. It turns each pa
 
 The vector-space model describes a passage by how much it uses each word. Give every word of the text a column and every passage a row; the cell in row i and column j says how strongly passage i uses word j. Passages about the same subject use the same words, so their rows have large numbers in the same columns.
 
-The matrix X built here has a row per passage and a column per word. Its words are the `STEMMED` tokens: lowercased and stemmed, without Lucene's stopwords, the question words, or tokens of 40 bytes or more. The SMART list of step 1 plays no part here. A word gets a column when it is in at least `MIN_PASSAGES` = 2 passages and in at most `MAX_SHARE` = 0.5 of them: as the code's comments put it, a word in fewer passages "says nothing about topics", and a word in more "is in every topic". Columns are in the sorted order of their stems as Rust compares strings, which is alphabetical for the letters a to z and puts digits first, so the same passages always give the same matrix. Below, v is the number of columns.
+The matrix built here, X, takes its words from the `STEMMED` tokens: lowercased and stemmed, without Lucene's stopwords, the question words, or tokens of 40 bytes or more. The SMART list of step 1 plays no part here. A word gets a column when it is in at least `MIN_PASSAGES` = 2 passages and in at most `MAX_SHARE` = 0.5 of them: as the code's comments put it, a word in fewer passages "says nothing about topics", and a word in more "is in every topic". Columns are in the sorted order of their stems as Rust compares strings, which is alphabetical for the letters a to z and puts digits first, so the same passages always give the same matrix. Below, v is the number of columns.
 
 A cell holds
 
@@ -151,9 +151,9 @@ Each row is then scaled to unit length: every cell of the row is divided by $\sq
 | p4 | | | 0.607 | | 0.607 | 0.513 |
 | p5 | 0.707 | | 0.707 | | | |
 
-Empty cells hold 0. `tfidf` stores only the non-zero cells of each row, as `(column, weight)` pairs. Every row holds a word, so $\lVert X \rVert^2 = 6$.
+Empty cells hold 0. Every row holds a word, so $\lVert X \rVert^2 = 6$.
 
-In *Alice*, the 166 passages hold 20,263 `STEMMED` tokens, 1,308 words get a column, and 11,709 of the 217,128 cells of X, 5.4%, are non-zero. Every passage holds a word with a column, so $\lVert X \rVert^2 = 166$.
+In *Alice*, the 166 passages hold 20,263 `STEMMED` tokens, and 1,308 of their words get a column. X is mostly zeros: 11,709 of its 217,128 cells, 5.4%, are non-zero, so `tfidf` stores only the non-zero cells of each row, as `(column, weight)` pairs. Every passage holds a word with a column, so $\lVert X \rVert^2 = 166$.
 
 ### Topics as a factorization: NMF
 
@@ -165,13 +165,11 @@ Read W as passages by topics and H as topics by words. Row i of W says how much 
 
 $$\underbrace{X}_{n \times v} \;\approx\; \underbrace{W}_{n \times k} \; \underbrace{H}_{k \times v}$$
 
-k is far smaller than v (13 against 1,308 in *Alice*), so WH can in general only approximate X. The factorization chooses W and H to make the squared error small:
+The rank of the factorization, k, is the number of topics. k is far smaller than v (13 against 1,308 in *Alice*), so WH can in general only approximate X. The factorization chooses W and H to make the squared error small:
 
 $$\lVert X - WH \rVert^2 = \sum_{i,j} \left( X_{ij} - (WH)_{ij} \right)^2$$
 
 Non-negative matrix factorization (NMF) adds one condition: every entry of W and H is 0 or more. A product of non-negative factors can only add topics together, never subtract one from another, so each topic has to be a group of words that occur together, and each passage is approximated as a sum of such groups. That is what makes the factors readable: a row of H is a list of words with weights, and a row of W is a list of topic shares. Lee and Seung (1999) show NMF learning parts this way, for images of faces and for encyclopedia articles, and contrast it with methods such as principal component analysis, which allow negative entries and learn holistic patterns rather than parts.
-
-The rank of the factorization, k, is the number of topics.
 
 ### How `nmf` finds W and H
 
@@ -181,7 +179,7 @@ $$H \leftarrow H \circ \frac{W^\top X}{W^\top W H + \epsilon} \qquad W \leftarro
 
 $W^\top$ is W transposed, its rows turned into columns. The products $W^\top X$, $W^\top W H$, $X H^\top$ and $W H H^\top$ are ordinary matrix products, while $\circ$ and the fraction bar act entry by entry: each entry of H is multiplied by one ratio. `EPSILON` = 1e-10 keeps the ratio defined when a denominator is 0. The code keeps H transposed, as a v × k matrix, so that its inner loops run over contiguous memory.
 
-The update is a gradient step with a step size chosen per entry (Lee and Seung 2001, section 5). The gradient of the error with respect to H is the table of its slopes, one per entry of H: how fast the error grows as that entry grows. For the squared error it is proportional to $W^\top W H - W^\top X$. An ordinary gradient step subtracts a small multiple η of it from H, and can push an entry below 0. Choosing $\eta = H / (W^\top W H)$ for each entry turns the step into
+The update is a gradient step with a step size chosen per entry (Lee and Seung 2001, section 5). The gradient of the error with respect to H is the table of its slopes, one per entry of H: how fast the error grows as that entry grows. For the squared error it is proportional to $W^\top W H - W^\top X$. An ordinary gradient step subtracts a small multiple η of it from H, which can push an entry below 0. Choosing $\eta = H / (W^\top W H)$ for each entry turns the step into
 
 $$H - \frac{H}{W^\top W H} \circ \left( W^\top W H - W^\top X \right) = H \circ \frac{W^\top X}{W^\top W H}$$
 
@@ -190,7 +188,7 @@ which is the update above without ε. The same holds for W. The ratio compares, 
 The updates have two properties.
 
 - **No entry turns negative.** X, W and H hold no negative numbers, so the numerator and the denominator of every ratio are 0 or more, and multiplying an entry that is 0 or more by such a ratio leaves it 0 or more. No clipping is needed.
-- **The error never rises.** Lee and Seung (2001, Theorem 1) prove that the squared error is non-increasing under the updates without ε. ε = 1e-10 changes a ratio noticeably only where the denominator is not much larger than 1e-10.
+- **The error never rises.** Lee and Seung (2001, Theorem 1) prove that the squared error is non-increasing under the updates without ε, but ε = 1e-10 changes a ratio noticeably only where the denominator is not much larger than 1e-10.
 
 The error can have several local minima, so where the updates end depends on where they start. The start therefore comes from a SplitMix64 generator (Steele, Lea and Flood 2014) seeded with `NMF_SEED` = 1, whose sequence depends only on the seed, so every machine starts from the same W and H. The generator fills W first, row by row, then H, word by word. Each entry is uniform on [0, 2√(x̄/k)), where x̄ is the mean cell of X with zeros included, so that WH starts with the same mean as X.
 
@@ -220,7 +218,7 @@ Topic 0 is the tea party, with tea, dormous and hatter; topic 1 is the croquet g
 
 ## Step 3: choosing concepts
 
-`select` in `src/lib.rs` keeps the candidates that best predict a passage's topic. It measures this by mutual information, which rests on entropy.
+`select` in `src/lib.rs` keeps the candidates that best predict a passage's topic. It measures how well a candidate predicts the topic by mutual information, which rests on entropy.
 
 ### Entropy
 
@@ -246,7 +244,7 @@ where $\mathrm{H}(G \mid T)$ is the entropy that remains in G once the topic is 
 
 $$I(T;G) = \sum_{t} \sum_{g \in \{0,1\}} p(t,g) \ln \frac{p(t,g)}{p(t)\,p(g)}$$
 
-If T and G were independent, a passage of topic t would hold the phrase as often as any other passage, and $p(t,g)$ would equal $p(t)\,p(g)$. Each term compares the two: its logarithm is 0 when they are equal, positive when the pair (t, g) is more common than independence predicts, and negative when it is rarer. The sum is 0 when T and G are independent and positive otherwise. It can never exceed $\mathrm{H}(G)$, because $\mathrm{H}(G \mid T)$ cannot fall below 0.
+If T and G were independent, a passage of topic t would hold the phrase as often as any other passage, so $p(t,g)$ would equal $p(t)\,p(g)$. Each term compares the two: its logarithm is 0 when they are equal, positive when the pair (t, g) is more common than independence predicts, and negative when it is rarer. The sum is 0 when T and G are independent and positive otherwise. It can never exceed $\mathrm{H}(G)$, because $\mathrm{H}(G \mid T)$ cannot fall below 0.
 
 `mutual_information` in `src/lib.rs` computes the sum in nats, with every probability a share of the n passages. For each topic t:
 
@@ -256,7 +254,7 @@ If T and G were independent, a passage of topic t would hold the phrase as often
 
 A term without passages counts as 0, the limit of $p \ln p$ as p falls to 0.
 
-**A 2 × 2 table.** In the toy text, "tea" stands in p0, p2 and p4, and step 2 put p0, p1 and p2 in topic 0 and the rest in topic 1. The toy text is too small for the limits of step 1, but the score does not depend on them. Counting passages:
+**A 2 × 2 table.** In the toy text, "tea" stands in p0, p2 and p4. Step 2 put p0, p1 and p2 in topic 0 and the rest in topic 1. The toy text is too small for the limits of step 1, but the score does not depend on them. Counting passages:
 
 | | holds tea (g = 1) | lacks tea (g = 0) | all |
 |---|---|---|---|
@@ -264,7 +262,9 @@ A term without passages counts as 0, the limit of $p \ln p$ as p falls to 0.
 | topic 1 | 1 | 2 | 3 |
 | all | 3 | 3 | 6 |
 
-Every row and column share is 1/2, so independence predicts 1/4 of the passages in each cell. Each cell with 2 passages holds 1/3, a ratio of 1.3333, and its term is 0.3333 × ln 1.3333 = 0.3333 × 0.2877 = 0.0959. Each cell with 1 passage holds 1/6, a ratio of 0.6667, and its term is 0.1667 × (−0.4055) = −0.0676. The sum is 0.0566 nats. G has the largest entropy a yes-or-no variable can have, ln 2 = 0.693, but the topic removes less than a tenth of it, because tea is in both topics. The unit test pins the two extremes for four passages in topics 0, 0, 1, 1. A phrase in the first two scores ln 2, as the topic tells exactly whether a passage holds it; a phrase in the first and the third scores 0, as the topic tells nothing.
+Every row and column share is 1/2, so independence predicts 1/4 of the passages in each cell. Each cell with 2 passages holds 1/3, a ratio of 1.3333, and its term is 0.3333 × ln 1.3333 = 0.3333 × 0.2877 = 0.0959. Each cell with 1 passage holds 1/6, a ratio of 0.6667, and its term is 0.1667 × (−0.4055) = −0.0676. The sum is 0.0566 nats. G has the largest entropy a yes-or-no variable can have, ln 2 = 0.693, but the topic removes less than a tenth of it, because tea is in both topics.
+
+The unit test pins the two extremes for four passages in topics 0, 0, 1, 1. A phrase in the first two scores ln 2, as the topic tells exactly whether a passage holds it; a phrase in the first and the third scores 0, as the topic tells nothing.
 
 **"march hare" in *Alice*** stands in 17 passages: 12 in topic 8, one each in topics 3, 4, 6, 10 and 11, and none in the other seven topics. Its term for topic 8 and g = 1 alone is 0.159, and the whole sum is 0.200 nats, out of the 0.330 its entropy allows.
 
@@ -272,17 +272,17 @@ Every row and column share is 1/2, so independence predicts 1/4 of the passages 
 
 The score is high for a phrase whose passages fall in few topics. The bound $\mathrm{H}(G)$ makes it low for a phrase in few passages, however concentrated: a phrase in 3 of the 166 passages can score at most 0.090. "serpent" stands in 3 passages, all in topic 9, which holds only 4, and scores 0.0769.
 
-The `GRAPH_CONCEPTS` = 60 highest scores become the concepts, ties going to the phrase in more passages, then to the lower key. In *Alice* the highest are "king" (0.258), "queen" (0.255) and "hatter" (0.245), and "march hare" ranks 8th. The 60th, "shouted", scores 0.079992. "thing", in 38 passages, scores 0.079985 and ranks 61st, and "serpent" ranks 63rd.
+The `GRAPH_CONCEPTS` = 60 highest scores become the concepts, ties going to the phrase in more passages, then to the lower key. In *Alice* the highest are "king" (0.258), "queen" (0.255) and "hatter" (0.245), and "march hare" ranks 8th. The 60th, "shouted", scores 0.079992. Below the cut, "thing", in 38 passages, scores 0.079985 and ranks 61st, and "serpent" ranks 63rd.
 
 The concepts are then sorted by their first passage, ties by label, and numbered from 0 in that order.
 
 ## Step 4: links
 
-`links` in `src/lib.rs` links concepts that share more passages than chance predicts. Chance here means independence, and the measure is normalized pointwise mutual information (NPMI).
+`links` in `src/lib.rs` links concepts that share more passages than chance predicts. Chance here means independence. Normalized pointwise mutual information (NPMI) measures how far a pair of concepts departs from it.
 
 ### Pointwise mutual information
 
-Let $d_a$ and $d_b$ be the numbers of passages concepts a and b stand in, and s the number both stand in. As shares of the n passages, $p(a) = d_a/n$, $p(b) = d_b/n$ and $p(a,b) = s/n$. If the two concepts were placed in passages independently, a passage would hold both with probability $p(a)\,p(b)$, and they would share $d_a d_b / n$ passages on average.
+Let $d_a$ and $d_b$ be the numbers of passages concepts a and b stand in, and s the number both stand in. As shares of the n passages, $p(a) = d_a/n$, $p(b) = d_b/n$ and $p(a,b) = s/n$. If the two concepts were placed in passages independently, a passage would hold both with probability $p(a)\,p(b)$, so they would share $d_a d_b / n$ passages on average.
 
 Pointwise mutual information (PMI), which Church and Hanks (1990) used to measure how strongly two words go together, is the logarithm of the observed share over the share independence predicts:
 
@@ -328,11 +328,11 @@ The two concepts in 3 passages each that share 2 have a PMI of 3.61, above the 2
 
 Each concept keeps up to `GRAPH_PARTNERS` = 3 partners. The partners it can keep are the concepts that share at least `GRAPH_MIN_SHARED` = 2 passages with it and have an NPMI above `GRAPH_NPMI_FLOOR` = 0.1; it keeps those with the highest NPMI, ties going to the lower id. A link exists when either concept keeps the other.
 
-"march hare" can keep seven partners, with NPMI from 0.924 for "hatter" down to 0.168 for "time", and keeps "hatter" (0.924), "dormouse" (0.718) and "majesty" (0.244). "time", in 47 passages, keeps "found" (0.177), "march hare" (0.168) and "hatter" (0.149). So "time" and "march hare" are linked, although "time" is only the seventh choice of "march hare". A concept that many others keep can therefore have more than three links ("king" has eight), and a concept that keeps no partner and is kept by none has no link. *Alice* has 123 links among its 60 concepts.
+Seven concepts qualify as partners of "march hare", with NPMI from 0.924 for "hatter" down to 0.168 for "time"; of these it keeps the three highest, "hatter" (0.924), "dormouse" (0.718) and "majesty" (0.244). "time", in 47 passages, keeps "found" (0.177), "march hare" (0.168) and "hatter" (0.149). So "time" and "march hare" are linked, although "time" is only the seventh choice of "march hare". A concept that many others keep can therefore have more than three links ("king" has eight), and a concept that keeps no partner and is kept by none has no link. *Alice* has 123 links among its 60 concepts.
 
-The share limit of step 1 keeps the formula defined. Both concepts stand in at most 0.3n passages, so s is at most 0.3n and the denominator is at least ln(1/0.3) = 1.204, never 0. One shared passage would be enough to keep the logarithms finite; the code asks for 2.
+The share limit of step 1 keeps the formula defined. Both concepts stand in at most 0.3n passages, so s is at most 0.3n and the denominator is at least ln(1/0.3) = 1.204, never 0. One shared passage would be enough to keep the logarithms finite, but the code asks for 2.
 
-The output rounds NPMI to three decimals. Step 5 uses the unrounded value.
+The output rounds NPMI to three decimals, but step 5 uses the unrounded value.
 
 ## Step 5: communities
 
@@ -340,9 +340,9 @@ The output rounds NPMI to three decimals. Step 5 uses the unrounded value.
 
 A graph is a set of nodes and a set of edges, each edge joining two nodes. Here the nodes are the concepts and the edges are the links. The edges are undirected, as a link between a and b is the same as one between b and a. They are weighted: each carries a number, the link's NPMI.
 
-A weighted graph can be written as its adjacency matrix A, with a row and a column per node: $A_{ij}$ is the weight of the edge between i and j, 0 if there is none, and $A_{ij} = A_{ji}$. The degree $\mathrm{deg}_i$ of node i is the sum of the weights of its edges. m is the sum of all edge weights; every edge counts in the degrees of both its ends, so the degrees add up to 2m.
+A weighted graph can be written as its adjacency matrix A, with a row and a column per node: $A_{ij}$ is the weight of the edge between i and j, 0 if there is none, and, as the edges are undirected, $A_{ij} = A_{ji}$. The degree $\mathrm{deg}_i$ of node i is the sum of the weights of its edges. m is the sum of all edge weights; every edge counts in the degrees of both its ends, so the degrees add up to 2m.
 
-The five-node graph below serves as the example for this step. Its weights are NPMI-like values, and a weak edge joins two groups.
+The example for this step is the five-node graph below: two groups joined by a weak edge, with NPMI-like values as weights.
 
 ```mermaid
 graph LR
@@ -353,7 +353,7 @@ graph LR
     n3 ---|0.9| n4((4))
 ```
 
-Its degrees are 1.7, 1.6, 1.7, 1.1 and 0.9, and m = 3.5.
+Its degrees are 1.7, 1.6, 1.7, 1.1 and 0.9, so m = 3.5.
 
 ### Modularity
 
@@ -363,7 +363,7 @@ $$Q = \frac{1}{2m} \sum_{i,j} \left( A_{ij} - \frac{\mathrm{deg}_i \, \mathrm{de
 
 Here $c_i$ is the community of node i, and $\delta(c_i, c_j)$ is 1 when i and j are in one community and 0 otherwise, so only pairs inside a community count. $\mathrm{deg}_i \mathrm{deg}_j / 2m$ is the weight that would join i and j if the same total weight were spread at random over the graph while every node kept its degree (Newman 2006). Each term is the weight observed between two nodes minus the weight expected, and Q adds these up over the pairs in the same community.
 
-Q rewards communities with more weight inside than their degrees predict. It does not reward putting everything together: with one community, the observed and the expected weights both add up to 2m, and Q is 0. For the five-node graph:
+Q rewards communities with more weight inside than their degrees predict. It does not reward putting everything together: with one community, the observed and the expected weights both add up to 2m, so Q is 0. For the five-node graph:
 
 | Division | Q |
 |---|---|
@@ -391,11 +391,11 @@ flowchart LR
 
 $$\Delta Q = \frac{A_{i,C}}{m} - \frac{\Sigma_C \, \mathrm{deg}_i}{2m^2}$$
 
-where $A_{i,C}$ is the weight of i's links into C (`weight_to` in the code) and $\Sigma_C$ is the sum of the degrees of the nodes in C, i excluded (`total`). The first part counts the weight i would bring inside C and the second the weight chance would put between i and C, both divided by m. The node joins the community with the largest gain, which may be the one it came from.
+where $A_{i,C}$ is the weight of i's links into C (`weight_to` in the code) and $\Sigma_C$ is the sum of the degrees of the nodes in C, i excluded (`total`). The first part counts the weight i would bring inside C and the second the weight chance would put between i and C, both divided by m. There is no resolution parameter, so the gains are those of the plain modularity above. The node joins the community with the largest gain, which may be the one it came from. Sweeps over all nodes repeat until a sweep moves no node.
 
-The rules for ties make the result the same on every run. Its own community is the first best. The other communities are tried in the order of i's neighbours by index, and one replaces the best so far only when its gain is larger by more than `MIN_GAIN` = 1e-7. A tie therefore goes to the community found first, and rounding cannot make a node move back and forth. Sweeps over all nodes repeat until a sweep moves no node.
+The rules for ties make the result the same on every run. The node's own community starts as the best. The other communities are tried in the order of i's neighbours by index, and one replaces the best so far only when its gain is larger by more than `MIN_GAIN` = 1e-7. A tie therefore goes to the community found first, and rounding cannot make a node move back and forth.
 
-In the five-node graph, node 0 is visited first. Taken out of its community it is alone, and staying alone gains 0. Joining node 1 gains
+In the five-node graph, node 0 is visited first. Taken out of its community it is alone, so staying alone gains 0. Joining node 1 gains
 
 $$\frac{0.9}{3.5} - \frac{1.6 \times 1.7}{2 \times 3.5^2} = 0.146$$
 
@@ -406,19 +406,19 @@ and joining node 2 gains 0.111, so node 0 joins node 1. Modularity rises from �
 - Node 3 gains −0.167 by joining {0, 1, 2} and 0.217 by joining node 4, so it joins node 4.
 - Node 4 is taken out of {3, 4}. Returning gains 0.217, and it has no other neighbour, so it stays.
 
-The second sweep moves no node, and phase 1 ends with {0, 1, 2} and {3, 4}.
+The second sweep moves no node, so phase 1 ends with {0, 1, 2} and {3, 4}.
 
 **Phase 2, `aggregate`.** Each community becomes one node. The links between two communities add up to one link, and the links inside a community become a self-loop holding twice their weight, as the adjacency matrix would. Each new node's degree is therefore the sum of its members' degrees, and m stays as it was. In the example, {0, 1, 2} becomes a node with a self-loop of 4.8, {3, 4} a node with a self-loop of 1.8, and the two are joined by 0.2.
 
-Phase 1 then runs on the smaller graph, where moving a node moves a whole community. In the example, moving either new node into the other's community gains −0.351, so nothing moves and the method stops with {0, 1, 2} and {3, 4}, Q = 0.351. In general the two phases repeat until a phase 1 moves no node. `move_nodes` numbers the communities from 0 in order of first appearance, so the nodes of the next level are again visited in a fixed order.
+Phase 1 then runs on the smaller graph, where moving a node moves a whole community. `move_nodes` numbers the communities from 0 in order of first appearance, so the nodes of the next level are again visited in a fixed order. The two phases repeat, with no limit on the number of passes, until a phase 1 moves no node. In the example, moving either new node into the other's community gains −0.351, so nothing moves and the method stops with {0, 1, 2} and {3, 4}, Q = 0.351.
 
-There is no resolution parameter, so the gains are those of the plain modularity above, and there is no limit on the number of passes. A concept without links stays a community of its own, and a graph without links has one community per concept.
+A concept without links stays a community of its own, so a graph without links has one community per concept.
 
 `build` orders the communities largest first, ties going to the community whose first concept the text mentions earlier, and numbers them in that order. *Alice* has 8 communities. "time", "hatter", "march hare" and "dormouse" form one, and "mock turtle" and "gryphon" are in another.
 
 ## What the graph reads
 
-The graph filters nothing. It reads every passage it is given, so notes, a contents page, a bibliography, an index, running heads and licence text count like the body of the text. A caller who wants them left out removes them from the passages before calling `build`.
+The graph filters nothing: it reads every passage it is given, so notes, a contents page, a bibliography, an index, running heads and licence text count like the body of the text. A caller who wants them left out removes them from the passages before calling `build`.
 
 ## Output
 
@@ -432,7 +432,7 @@ The graph filters nothing. It reads every passage it is given, so notes, a conte
 | `links[]` | `a` (the lower id), `b`, `npmi` (three decimals), and the `passage_count` and `passages` of the passages both concepts stand in |
 | `communities[]` | `id` and `concepts` (ids, ascending) |
 
-Concepts come in the order the text first mentions them, links sorted by `a` and then `b`, and communities largest first. Every passage id is an index into the slice `build` was given, and a link's passages are passages of both its concepts.
+Concepts come in the order the text first mentions them, links sorted by `a` and then `b`, and communities largest first. Every passage id is an index into the slice `build` was given.
 
 A text in which no phrase is a candidate gets an empty graph, with no concepts, links or communities.
 
@@ -440,32 +440,32 @@ A text in which no phrase is a candidate gets an empty graph, with no concepts, 
 
 Phrases. A concept is named in the text's own words and backed by the passages that hold them, so every concept can be checked by reading. Cutting at stopwords and punctuation keeps a multi-word name such as "march hare" or "mock turtle" whole without a parser or a model. Stemmed keys gather the inflected forms of a phrase under one concept.
 
-Topics. Frequency alone favours phrases spread evenly through a text. Mutual information with the topics favours phrases that tell its parts apart: of two phrases in the same number of passages, the one whose passages fall in fewer topics scores higher. The share limits remove what is everywhere before either count is made.
+Topics. Frequency alone favours phrases spread evenly through a text, while mutual information with the topics favours phrases that tell its parts apart: of two phrases in the same number of passages, the one whose passages fall in fewer topics scores higher. The share limits remove what is everywhere before either count is made.
 
-NPMI rather than shared counts. The number of passages two concepts share grows with how common each of them is. In *Alice*, "time" stands in 47 passages and shares 8 with "hatter", half as many as "march hare" shares with it. Yet chance alone predicts 47 · 18 / 166 ≈ 5.1 shared passages for "time", so its NPMI with "hatter" is 0.149 against 0.924 for "march hare". Plain PMI errs the other way and favours rare pairs, as step 4 shows. Dividing by −ln p(a,b) bounds the score between −1 and 1 with fixed meanings at −1, 0 and 1 (Bouma 2009), so one floor of 0.1 serves every pair in every text.
+NPMI rather than shared counts. The number of passages two concepts share grows with how common each of them is. In *Alice*, "time" stands in 47 passages and shares 8 with "hatter", half as many as "march hare" shares with it. Yet chance alone predicts 47 · 18 / 166 ≈ 5.1 shared passages for "time", so its NPMI with "hatter" is 0.149 against 0.924 for "march hare". Plain PMI errs the other way: it favours rare pairs, as step 4 shows. Dividing by −ln p(a,b) bounds the score between −1 and 1 with fixed meanings at −1, 0 and 1 (Bouma 2009), so one floor of 0.1 serves every pair in every text.
 
-Communities. Modularity measures how linked a set of concepts is against what the concepts' degrees alone predict, so a concept with many links does not draw every concept it touches into its community. In *Alice*, "hatter", "march hare" and "dormouse" form one community, and "king", "jury", "trial", "court" and "slates" are in another.
+Communities. Modularity measures how linked a set of concepts is against what the concepts' degrees alone predict, so a concept with many links does not draw every concept it touches into its community. In *Alice*, "queen" is linked to "shouted" and "duchess", yet both belong to other communities, and "hatter" is linked to "court" but stays with "march hare", "dormouse" and "time".
 
-Determinism. The same passages give the same graph on every machine. The NMF start comes from a fixed seed, the matrix columns are in word order, Louvain visits nodes in index order, and every sort breaks ties by count, id or key.
+Determinism. The same passages give the same graph on every machine, because the NMF start comes from a fixed seed, the matrix columns are in word order, Louvain visits nodes in index order, and every sort breaks ties by count, id or key.
 
 ## Limits
 
 - The input needs at least 20 passages.
-- A graph has at most 60 concepts, however long the text. In a long text more subjects compete for the 60 places, and a subject whose phrases score lower is left out however often it occurs.
+- A graph has at most 60 concepts, however long the text. In a long text more subjects compete for the 60 places, so a subject whose phrases score lower is left out however often it occurs.
 - The method is for English: the SMART stopwords, Lucene's stopwords, the question words and the stemmer are English.
 - A phrase is any run of up to three content words, not a noun phrase. In *Alice* "thought alice" is a concept, because "said" is a SMART stopword and "thought" is not.
 - A name that holds a stopword, a digit or a word of fewer than three letters is split or lost: "queen of hearts" gives "queen" and "hearts". A run of more than three content words gives nothing.
 - The 30% limit can remove a text's most frequent subject. In *Alice* "alice" stands alone in 105 of the 166 passages, where the limit allows 49, so the heroine is not a concept.
-- Only stand-alone mentions count. Pronouns, synonyms and a concept's words inside a longer phrase add nothing to its passages, and "hatter" and "mad hatter" would be two concepts.
+- Only stand-alone mentions count. Pronouns, synonyms and a concept's words inside a longer phrase add nothing to its passages, so "hatter" and "mad hatter" would be two concepts.
 - Whitespace never cuts a phrase, line breaks included. A heading, paragraph or list item that ends without punctuation therefore runs into the first words of whatever follows it in the passage.
-- A link says only that two concepts share passages more often than chance predicts. It has no direction or kind, and a passage counts as one place whatever the distance between the two inside it.
-- Each passage belongs to exactly one topic, and the number of topics is fixed at √n rounded. The concepts are chosen by these topics, so a different factorization would choose different concepts.
+- A link says only that two concepts share passages more often than chance predicts. It has no direction or kind. A passage counts as one place, whatever the distance between the two inside it.
+- Each passage belongs to exactly one topic. The number of topics is fixed at √n rounded. The concepts are chosen by these topics, so a different factorization would choose different concepts.
 - Louvain returns a local optimum of modularity, the one its fixed visiting order reaches.
-- Apparatus counts like text. The Project Gutenberg header and licence of *Alice* (passage 0 and passages 149 to 165) form a topic of their own and give concepts such as "project gutenberg", "electronic works", "www", "gutenberg" and "org", and three of the eight communities consist mostly of them. "www", "gutenberg" and "org" are linked with an NPMI of 1, because the dots of www.gutenberg.org cut it into three phrases that always stand together.
+- Apparatus counts like text. The Project Gutenberg header and licence of *Alice* (passage 0 and passages 149 to 165) form a topic of their own and give concepts such as "project gutenberg", "electronic works", "www", "gutenberg" and "org". Three of the eight communities consist mostly of these concepts. "www", "gutenberg" and "org" are linked with an NPMI of 1, because the dots of www.gutenberg.org cut it into three phrases that always stand together.
 
 ## References
 
-Each entry says what to read it for. The books by Manning, Raghavan and Schütze, by Jurafsky and Martin, by MacKay and by Barabási are free online.
+The books by Manning, Raghavan and Schütze, by Jurafsky and Martin, by MacKay and by Barabási are free online.
 
 ### Words, stems and TF-IDF
 
