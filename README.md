@@ -1,27 +1,31 @@
 # concept-graph
 
-`concept-graph` builds the concept graph of a text from its passages. A concept is a phrase from the text, such as "march hare" or "transcendental realism", that marks one of its topics. Two concepts are linked when they stand in the same passages more often than chance predicts, and linked concepts fall into communities. Every concept and every link carries the ids of its passages, so each one can be checked against the text.
+Builds a map of a long text from its passages: the phrases it keeps returning to, which of them go together, and where each one appears.
 
-`build` makes the graph in five steps:
+A concept is a phrase from the text, such as "march hare" or "transcendental realism". Two concepts are linked when they share passages more often than chance predicts, and linked concepts form communities: in *Alice in Wonderland*, "hatter", "march hare", "dormouse" and "time" form one, while "king", "queen", "jury" and "trial" belong to another. Every concept and every link lists its passages, so you can read the text behind it. The crate needs no model or training data.
 
-1. Candidate phrases: the runs of one to three content words between stopwords and punctuation, as RAKE cuts them, that stand in at least 3 passages and in at most 30% of them.
-2. Topics: the passages sorted into round(√n) topics by non-negative matrix factorization (NMF) of their TF-IDF weights.
-3. Concepts: the 60 candidates with the most mutual information with the topics.
-4. Links: for each concept, up to three partners with the highest normalized pointwise mutual information (NPMI) above 0.1, among the concepts that share at least 2 passages with it.
-5. Communities: the Louvain method on the links, weighted by their NPMI.
+## How it works
 
-[docs/concept-graph.md](docs/concept-graph.md) explains each step, its maths and its choices, with worked examples.
+`build` takes five steps:
 
-## Adding it
+1. **Phrases.** It cuts each passage at stopwords such as "the" and "said" and at punctuation, so "the March Hare said" gives the phrase "march hare". Phrases of up to three words that appear in at least 3 passages, but in no more than 30% of them, go on to step 3.
+2. **Topics.** It sorts the passages into topics by the words they use (TF-IDF weights, factorized by non-negative matrix factorization).
+3. **Concepts.** It keeps the 60 phrases that best tell those topics apart (by mutual information).
+4. **Links.** Each concept chooses up to three partners with which it shares far more passages than chance predicts, and either choice makes a link, so a popular concept can have more than three. The score, normalized pointwise mutual information (NPMI), is 1 for two concepts that always appear together and 0 for two that share passages only by chance.
+5. **Communities.** It splits the linked concepts into groups that are more linked to each other than to the rest (the Louvain method).
 
-The crate is not on crates.io, so add it as a git dependency:
+[docs/concept-graph.md](docs/concept-graph.md) explains each step from the basics, with worked examples on *Alice in Wonderland*.
+
+## Install
+
+The crate is not on crates.io yet, so add it from git:
 
 ```toml
 [dependencies]
 concept-graph = { git = "https://github.com/AhmedKishki/concept-graph" }
 ```
 
-It needs Rust 1.92 or later and depends on `frostem` and `serde`.
+It needs Rust 1.92 or later.
 
 ## Usage
 
@@ -71,92 +75,24 @@ crying and gryphon danced: NPMI 1, passages [0, 4, 8, 12, 16, 20]
 
 ## Input
 
-`build(texts: &[&str])` takes the passages of one text, in reading order.
-
-- A passage is the unit of co-occurrence: two concepts occur together when both stand in one passage, wherever they are inside it. The constants below were chosen for passages of whole paragraphs of at most 220 words.
-- There must be at least 20 passages.
-- A passage's id in the output is its index in `texts`. Concepts are numbered in the order of their first passage, and ties between communities go to the one the text mentions first, so the order of `texts` matters.
-- The texts need no preparation: `build` lowercases, splits and stems the words itself. Whitespace, line breaks included, only separates words, so a heading or list item that ends without punctuation runs into the words after it in the same passage.
-- Everything in the passages counts. Notes, a contents page, an index, running heads and licence text give concepts like the body of the text, so remove what should not count before calling `build`.
+- The passages of one text, in reading order, at least 20 of them. The settings were chosen for passages of whole paragraphs of at most 220 words.
+- Plain text, which needs no preparation, because `build` splits, lowercases and stems the words itself. Everything in it counts, though, so remove notes, an index, running heads or licence text that you do not want in the graph.
+- English. The stopword lists and the stemmer are English, so other languages give poor concepts.
 
 ## Output
 
-`build` returns a `GraphResult`. It and the types it holds derive serde's `Serialize` and `Deserialize`.
+`build` returns a `GraphResult`, which serde can serialize:
 
-| `GraphResult` field | What it holds |
-|---|---|
-| `passages` | n, the number of passages |
-| `topics` | k, the number of topics the concepts were chosen with |
-| `concepts` | at most 60 `Concept`s, in the order of their first passage |
-| `links` | the `Link`s, sorted by `a` and then `b` |
-| `communities` | the `Community`s, largest first |
+- `concepts`, each with its `label`, its `passages` and its `community`;
+- `links`, each joining two concepts `a` and `b`, with their `npmi` and the `passages` they share;
+- `communities`, each with its `concepts`, the largest community first;
+- `passages` and `topics`, the number of passages and of topics.
 
-| `Concept` field | What it holds |
-|---|---|
-| `id` | its index in `concepts` |
-| `label` | the lowercased form the text most often writes it in |
-| `passage_count` | how many passages it stands in as a phrase of its own, cut off from other words by stopwords or punctuation |
-| `passages` | those passages' ids, ascending |
-| `community` | the index of its community in `communities` |
-
-| `Link` field | What it holds |
-|---|---|
-| `a`, `b` | the ids of its two concepts, `a` the lower |
-| `npmi` | NPMI rounded to three decimals: 1 when the two only ever stand together, 0 when they share passages as often as chance predicts |
-| `passage_count` | how many passages both concepts stand in |
-| `passages` | those passages' ids, ascending |
-
-| `Community` field | What it holds |
-|---|---|
-| `id` | its index in `communities` |
-| `concepts` | its concepts' ids, ascending |
-
-A concept stands in a passage only as a run of its own: "turtle" inside "mock turtle" does not count for a concept "turtle". A text in which no phrase stands in at least 3 passages and in at most 30% of them has no concepts, so `build` returns an empty graph for it.
-
-The same passages always give the same graph: NMF starts from a fixed seed, and every sort breaks its ties.
-
-## Errors
-
-`build` returns an `Error` only when there are fewer than 20 passages. Its `passages` field holds how many there were, it displays as "the book has 19 passages; a concept graph needs at least 20", and it implements `std::error::Error`.
-
-## Constants
-
-The constants are fixed in the source, so no argument changes them.
-
-| Constant | Value | Meaning |
-|---|---|---|
-| `GRAPH_MIN_BOOK_PASSAGES` | 20 | the fewest passages `build` accepts |
-| `GRAPH_PHRASE_MAX_WORDS` | 3 | the most content words in a phrase; a longer run gives no phrase |
-| `MIN_WORD_LETTERS` | 3 | a word with fewer letters cuts a phrase, like a stopword |
-| `GRAPH_CANDIDATE_MIN_PASSAGES` | 3 | the fewest passages a candidate stands in |
-| `GRAPH_CANDIDATE_MAX_SHARE` | 0.3 | the largest share of the passages a candidate stands in |
-| `MIN_PASSAGES`, `MAX_SHARE` | 2, 0.5 | the fewest passages and the largest share of them a word is in to count for the topics |
-| `TOKEN_MAX_BYTES` | 40 | a token of this many bytes or more does not count for the topics |
-| `NMF_MAX_ITERATIONS` | 500 | the most NMF iterations |
-| `NMF_TOLERANCE` | 1e-4 | NMF stops when its error fell by less than this share since the check ten iterations before |
-| `NMF_SEED` | 1 | the seed of the generator that starts NMF |
-| `GRAPH_CONCEPTS` | 60 | the most concepts |
-| `GRAPH_PARTNERS` | 3 | the most partners a concept keeps |
-| `GRAPH_NPMI_FLOOR` | 0.1 | a partner's NPMI must be above this |
-| `GRAPH_MIN_SHARED` | 2 | the fewest passages a partner shares |
-
-## Language
-
-The analysis is for English only. Phrases are cut at the 571 SMART stopwords. The topics leave out Lucene's 33 English stopwords and nine question words. Both stem with the English Snowball stemmer of `frostem`, pinned to version 1.20260821.8 so that stems never change. Text in another language is still read, as words are runs of Unicode letters. But its stopwords do not cut phrases and its inflections are not merged, so its concepts are poor.
+Ids are indexes: a passage's id is its index in your input, and a concept's id is its index in `concepts`. The same input always gives the same graph. `build` fails only when there are fewer than 20 passages.
 
 ## Cost
 
-`build` runs on one thread. Its time goes mostly to NMF: an NMF iteration costs about z·k + (n + v)·k² operations for z non-zero cells, v words and k ≈ √n topics, and NMF stops after 500 iterations at most. Links compare every pair of the at most 60 concepts. Memory holds the sparse TF-IDF matrix and the two dense factors, n × k and v × k.
-
-Measured in a release build on an Intel Core Ultra 7 255H:
-
-| Passages | Words | Topics | Time |
-|---|---|---|---|
-| 166 | 29,000 | 13 | 0.07 s |
-| 650 | 100,000 | 25 | 0.42 s |
-| 2,402 | 427,000 | 49 | 4.3 s |
-
-The 2,402-passage text peaked at 41 MB for the whole process, its input included.
+`build` runs on one thread. On an Intel Core Ultra 7 255H it took 0.07 s for 166 passages, 0.42 s for 650 and 4.3 s for 2,402, and the largest peaked at 41 MB.
 
 ## License
 
