@@ -4,7 +4,7 @@
 
 ## This documentation, mapped
 
-The picture is concept-map's map of [concept-map.md](concept-map.md) itself, built from its 156 paragraphs and list items. Each colour is a community, a circle grows with its concept's passages, and a line thickens with its NPMI. The communities follow the document's subjects: phrases, the passage-by-word matrix and its topics, NPMI, the graph and its communities, the Louvain method, NMF, the *Alice* examples, and tokens and stems.
+The picture is concept-map's map of [concept-map.md](concept-map.md) itself, built from its 162 paragraphs and list items. Each colour is a community, a circle grows with its concept's passages, and a line thickens with its NPMI. The map is weak on this text: the document's own subjects, such as "NPMI", "Louvain" and "topic model", stand together too strongly to stay, so the map keeps words of the explanation instead. They fall into four linked communities, one around scoring and topics, one around choosing concepts, one around phrases and one around counting, and 14 concepts have no link at all and form communities of one.
 
 ![The concept map of concept-map.md](concept-map.png)
 

@@ -28,6 +28,9 @@ use topics::{passage_topics, topic_count};
 const GRAPH_CONCEPTS: usize = 60;
 const GRAPH_PARTNERS: usize = 3;
 const GRAPH_NPMI_FLOOR: f64 = 0.1;
+/// A pair of concepts at or above this NPMI is too strongly linked to be a
+/// moderate link, and `select` drops both.
+const GRAPH_NPMI_CEILING: f64 = 0.5;
 const GRAPH_MIN_SHARED: usize = 2;
 const GRAPH_MIN_BOOK_PASSAGES: usize = 20;
 
@@ -114,23 +117,27 @@ impl GraphResult {
     ///
     /// ```
     /// let mut texts = [
-    ///     "The Mock Turtle was crying, and the Gryphon danced the Lobster Quadrille.",
-    ///     "The Hatter and the March Hare were having tea with the Dormouse.",
-    ///     "The Queen of Hearts was at the trial of the Knave.",
-    ///     "Alice was down the rabbit hole, in a long hall.",
+    ///     "The Hatter and the March Hare.",
+    ///     "The March Hare and the Dormouse.",
+    ///     "The Dormouse and the Queen.",
+    ///     "The Queen and the Knave.",
     /// ]
-    /// .repeat(5);
-    /// texts.extend([
-    ///     "The Hatter was a witness at the trial.",
-    ///     "At the trial, the Hatter was the first witness.",
-    ///     "The Gryphon took Alice to the Mock Turtle.",
-    ///     "The Mock Turtle was crying.",
-    /// ]);
+    /// .repeat(3);
+    /// texts.extend(
+    ///     [
+    ///         "The Knave and the Gryphon.",
+    ///         "The Gryphon and the Mock Turtle.",
+    ///         "The Mock Turtle and the Caterpillar.",
+    ///         "The Caterpillar and the Hatter.",
+    ///     ]
+    ///     .repeat(2),
+    /// );
+    /// texts.extend(["The Hatter!", "The Dormouse!", "The Queen!", "The Gryphon!"]);
     ///
     /// let dot = concept_map::build(&texts)?.to_dot();
     /// assert!(dot.starts_with("graph map {\n"));
-    /// // Concept 0, "crying", is the node n0, in the first community's colour.
-    /// assert!(dot.contains(r##"n0 [width=0.329, fillcolor="#f0bf3c", xlabel="crying"];"##));
+    /// // Concept 0, "hatter", is the node n0, in the first community's colour.
+    /// assert!(dot.contains(r##"n0 [width=0.329, fillcolor="#f0bf3c", xlabel="hatter"];"##));
     /// // Printed and piped into `dot -Tsvg -o map.svg`, it draws the map.
     /// print!("{dot}");
     /// # Ok::<(), concept_map::Error>(())
@@ -273,22 +280,26 @@ impl std::error::Error for Error {}
 ///
 /// ```
 /// let mut texts = [
-///     "The Mock Turtle was crying, and the Gryphon danced the Lobster Quadrille.",
-///     "The Hatter and the March Hare were having tea with the Dormouse.",
-///     "The Queen of Hearts was at the trial of the Knave.",
-///     "Alice was down the rabbit hole, in a long hall.",
+///     "The Hatter and the March Hare.",
+///     "The March Hare and the Dormouse.",
+///     "The Dormouse and the Queen.",
+///     "The Queen and the Knave.",
 /// ]
-/// .repeat(5);
-/// texts.extend([
-///     "The Hatter was a witness at the trial.",
-///     "At the trial, the Hatter was the first witness.",
-///     "The Gryphon took Alice to the Mock Turtle.",
-///     "The Mock Turtle was crying.",
-/// ]);
+/// .repeat(3);
+/// texts.extend(
+///     [
+///         "The Knave and the Gryphon.",
+///         "The Gryphon and the Mock Turtle.",
+///         "The Mock Turtle and the Caterpillar.",
+///         "The Caterpillar and the Hatter.",
+///     ]
+///     .repeat(2),
+/// );
+/// texts.extend(["The Hatter!", "The Dormouse!", "The Queen!", "The Gryphon!"]);
 ///
 /// let map = concept_map::build(&texts)?;
 /// let hatter = map.concepts.iter().find(|c| c.label == "hatter").unwrap();
-/// assert_eq!(hatter.passages, [1, 5, 9, 13, 17, 20, 21]);
+/// assert_eq!(hatter.passages, [0, 4, 8, 15, 19, 20]);
 ///
 /// // 19 passages are too few.
 /// assert_eq!(concept_map::build(&texts[..19]).unwrap_err().passages, 19);
@@ -445,7 +456,15 @@ struct Selection {
 
 /// The `GRAPH_CONCEPTS` candidate phrases of `texts` that best predict a
 /// passage's topic, ties going to the phrase in more passages, then to the
-/// lower key.
+/// lower key, and none of them linked to another at or above
+/// `GRAPH_NPMI_CEILING`.
+///
+/// The best `GRAPH_CONCEPTS` candidates are taken first. Every one that is
+/// linked that strongly to another of them is dropped, with its partner, and
+/// the next best candidates fill the places. This repeats until no two
+/// concepts are that strongly linked or the candidates have run out, so a text
+/// can end with fewer than `GRAPH_CONCEPTS` concepts. A dropped candidate does
+/// not come back.
 fn select(texts: &[&str]) -> Selection {
     let k = topic_count(texts.len());
     let topic_of = passage_topics(texts, k);
@@ -462,11 +481,41 @@ fn select(texts: &[&str]) -> Selection {
             .then(y.passages.len().cmp(&x.passages.len()))
             .then(x.key.cmp(&y.key))
     });
-    scored.truncate(GRAPH_CONCEPTS);
+    let mut waiting = scored.into_iter().map(|(_, c)| c);
+    let mut chosen: Vec<Candidate> = Vec::new();
+    loop {
+        let room = GRAPH_CONCEPTS - chosen.len();
+        chosen.extend(waiting.by_ref().take(room));
+        let strong = strongly_linked(&chosen, texts.len());
+        if !strong.contains(&true) {
+            break;
+        }
+        let mut flags = strong.into_iter();
+        chosen.retain(|_| !flags.next().unwrap_or(false));
+    }
     Selection {
         topics: k as u32,
-        concepts: scored.into_iter().map(|(_, c)| c).collect(),
+        concepts: chosen,
     }
+}
+
+/// For each of `concepts`, whether some other concept shares at least
+/// `GRAPH_MIN_SHARED` passages with it and has an NPMI with it of at least
+/// `GRAPH_NPMI_CEILING`, in a text of `n` passages.
+fn strongly_linked(concepts: &[Candidate], n: usize) -> Vec<bool> {
+    let mut strong = vec![false; concepts.len()];
+    for (a, x) in concepts.iter().enumerate() {
+        for (b, y) in concepts.iter().enumerate().skip(a + 1) {
+            let both = intersection(&x.passages, &y.passages).len();
+            if both >= GRAPH_MIN_SHARED
+                && npmi(x.passages.len(), y.passages.len(), both, n) >= GRAPH_NPMI_CEILING
+            {
+                strong[a] = true;
+                strong[b] = true;
+            }
+        }
+    }
+    strong
 }
 
 /// `I(T; G)` in nats, between whether a passage is one of `occurs` and its
@@ -597,18 +646,32 @@ mod tests {
         format!("zz{}{}", letter(j / 26), letter(j))
     }
 
-    #[test]
-    fn select_keeps_the_most_informative_concepts_up_to_the_cap() {
-        // 100 passages and 80 one-word phrases, each in 3 neighbouring passages.
-        let texts: Vec<String> = (0..100)
+    /// 100 passages, each holding the phrases of `words` whose passages it is
+    /// one of.
+    fn passages_of(words: &[(String, Vec<usize>)]) -> Vec<String> {
+        (0..100)
             .map(|i| {
-                (0..80)
-                    .filter(|j| (i + 100 - j) % 100 < 3)
-                    .map(word)
+                words
+                    .iter()
+                    .filter(|(_, at)| at.contains(&i))
+                    .map(|(w, _)| w.as_str())
                     .collect::<Vec<_>>()
                     .join(", ")
             })
-            .collect();
+            .collect()
+    }
+
+    /// `count` phrases, each in 3 passages that it shares with no other
+    /// phrase more than once, so that none of them is strongly linked.
+    fn spread_words(count: usize) -> Vec<(String, Vec<usize>)> {
+        (0..count)
+            .map(|j| (word(j), vec![j, (j + 31) % 100, (j + 67) % 100]))
+            .collect()
+    }
+
+    #[test]
+    fn select_keeps_the_most_informative_concepts_up_to_the_cap() {
+        let texts = passages_of(&spread_words(80));
         let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
         let s = select(&refs);
         assert_eq!(s.topics, 10);
@@ -622,5 +685,79 @@ mod tests {
             .map(|c| mutual_information(&c.passages, &topic_of, &sizes))
             .collect();
         assert!(mi.windows(2).all(|w| w[0] >= w[1]), "{mi:?}");
+    }
+
+    #[test]
+    fn strongly_linked_marks_both_phrases_of_a_pair_at_or_above_the_ceiling() {
+        let phrase = |key: &str, passages: &[u32]| Candidate {
+            key: key.to_string(),
+            label: key.to_string(),
+            passages: passages.to_vec(),
+        };
+        let concepts = [
+            // Always together: NPMI 1.
+            phrase("a", &[0, 1, 2]),
+            phrase("b", &[0, 1, 2]),
+            // Share two passages, and only a little more than chance: NPMI below 0.5.
+            phrase("c", &[3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
+            phrase("d", &[3, 4, 13, 14, 15, 16, 17, 18, 19, 20]),
+            // Share one passage, which is too few to count.
+            phrase("e", &[21, 22]),
+            phrase("f", &[21, 23]),
+        ];
+        assert!(npmi(10, 10, 2, 100) < GRAPH_NPMI_CEILING);
+        assert_eq!(
+            strongly_linked(&concepts, 100),
+            [true, true, false, false, false, false]
+        );
+    }
+
+    #[test]
+    fn select_drops_strongly_linked_phrases_and_fills_their_places() {
+        // Two phrases that always stand together, in passages 0 to 2, and 80
+        // phrases that are not strongly linked to anything.
+        let mut words = spread_words(80);
+        words.push(("zzpairone".to_string(), vec![0, 1, 2]));
+        words.push(("zzpairtwo".to_string(), vec![0, 1, 2]));
+        let texts = passages_of(&words);
+        let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
+
+        let s = select(&refs);
+
+        assert_eq!(s.concepts.len(), GRAPH_CONCEPTS, "the places were filled");
+        assert!(
+            s.concepts.iter().all(|c| !c.label.starts_with("zzpair")),
+            "the pair was dropped"
+        );
+        assert!(
+            !strongly_linked(&s.concepts, refs.len()).contains(&true),
+            "no two concepts are strongly linked"
+        );
+        // The pair would have been chosen without the rule: it scores at least
+        // as much as the weakest concept that was.
+        let topic_of = passage_topics(&refs, s.topics as usize);
+        let mut sizes = vec![0; s.topics as usize];
+        topic_of.iter().for_each(|&t| sizes[t] += 1);
+        let pair = mutual_information(&[0, 1, 2], &topic_of, &sizes);
+        let weakest = s
+            .concepts
+            .iter()
+            .map(|c| mutual_information(&c.passages, &topic_of, &sizes))
+            .fold(f64::INFINITY, f64::min);
+        assert!(pair >= weakest, "{pair} < {weakest}");
+    }
+
+    #[test]
+    fn a_text_of_strongly_linked_phrases_ends_with_fewer_than_the_cap() {
+        // 30 phrases in three blocks of ten that always stand together.
+        let words: Vec<(String, Vec<usize>)> = (0..30)
+            .map(|j| (word(j), (0..3).map(|k| (j / 10) * 3 + k).collect()))
+            .collect();
+        let texts = passages_of(&words);
+        let refs: Vec<&str> = texts.iter().map(String::as_str).collect();
+
+        let s = select(&refs);
+
+        assert!(s.concepts.is_empty(), "{:?}", s.concepts);
     }
 }

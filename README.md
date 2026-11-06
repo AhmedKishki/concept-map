@@ -6,7 +6,7 @@ A concept is a phrase from the text, such as "march hare". Concepts that share p
 
 ## Alice in Wonderland, mapped
 
-The map of the Project Gutenberg EPUB of *Alice's Adventures in Wonderland*, in 166 passages. Each colour is a community, a circle grows with its concept's passages, and a line thickens with its NPMI. The trial, the tea party, the Gryphon and the Mock Turtle, and the Caterpillar each gather into a community, and the three communities at the top come from the Project Gutenberg licence that the book carries.
+The map of the Project Gutenberg EPUB of *Alice's Adventures in Wonderland*, in 166 passages. Each colour is a community, a circle grows with its concept's passages, and a line thickens with its NPMI. The characters, which always stand together, are too strongly linked to stay, so the map holds ordinary words of the story, such as "head", "looked", "cat" and "voice".
 
 ![The concept map of Alice's Adventures in Wonderland](docs/alice.png)
 
@@ -16,8 +16,8 @@ The map of the Project Gutenberg EPUB of *Alice's Adventures in Wonderland*, in 
 
 1. **Phrases.** It cuts the text at stopwords and punctuation, so "the March Hare said" gives "march hare", and keeps the phrases of up to three words that appear in at least 3 passages and at most 30% of them.
 2. **Topics.** It sorts the passages into topics by the words they use (non-negative matrix factorization of TF-IDF weights).
-3. **Concepts.** It keeps the 60 phrases that best predict a passage's topic (by mutual information).
-4. **Links.** Each concept picks up to three partners with which it shares far more passages than chance predicts, scored by normalized pointwise mutual information (NPMI): 1 for concepts always found together, 0 for chance. Either pick makes a link.
+3. **Concepts.** It keeps the 60 phrases that best predict a passage's topic (by mutual information), leaving out any that is linked to another at an NPMI of 0.5 or more.
+4. **Links.** Each concept picks up to three partners with which it shares more passages than chance predicts, scored by normalized pointwise mutual information (NPMI): 1 for concepts always found together, 0 for chance. Either pick makes a link. A pair at an NPMI of 0.5 or more is too strongly linked: step 3 drops both phrases and takes the next best in their places, so every link in the map is a moderate one.
 5. **Communities.** It groups the concepts that link more to each other than to the rest (the Louvain method).
 
 [docs/concept-map.md](docs/concept-map.md) explains each step from the basics, and [docs/README.md](docs/README.md) shows the crate's map of that explanation. [docs/usage.md](docs/usage.md) documents every public function and type, with recipes for common tasks.
@@ -28,23 +28,32 @@ Add it to `Cargo.toml`; it needs Rust 1.92 or later.
 
 ```toml
 [dependencies]
-concept-map = "0.1"
+concept-map = "0.2"
 ```
 
 ## Usage
 
 ```rust
 fn main() -> Result<(), concept_map::Error> {
-    // 24 passages in reading order. Each scene recurs in 6 of them, so its
-    // phrases are frequent enough to be concepts and rare enough to tell
-    // the scenes apart.
-    let scenes = [
-        "The Mock Turtle was crying, and the Gryphon danced the Lobster Quadrille.",
-        "The Hatter and the March Hare were having tea with the Dormouse.",
-        "The Queen of Hearts was at the trial of the Knave.",
-        "Alice was down the rabbit hole, in a long hall.",
-    ];
-    let texts: Vec<&str> = (0..24).map(|i| scenes[i % 4]).collect();
+    // 24 passages in reading order: 20 sentences that each name two
+    // neighbouring characters, and four that name one.
+    let mut texts = [
+        "The Hatter and the March Hare.",
+        "The March Hare and the Dormouse.",
+        "The Dormouse and the Queen.",
+        "The Queen and the Knave.",
+    ]
+    .repeat(3);
+    texts.extend(
+        [
+            "The Knave and the Gryphon.",
+            "The Gryphon and the Mock Turtle.",
+            "The Mock Turtle and the Caterpillar.",
+            "The Caterpillar and the Hatter.",
+        ]
+        .repeat(2),
+    );
+    texts.extend(["The Hatter!", "The Dormouse!", "The Queen!", "The Gryphon!"]);
 
     let map = concept_map::build(&texts)?;
     for community in &map.communities {
@@ -70,11 +79,10 @@ fn main() -> Result<(), concept_map::Error> {
 It prints
 
 ```text
-crying, gryphon danced, lobster quadrille, mock turtle
-dormouse, hatter, march hare, tea
-hearts, knave, queen, trial
-alice, long hall, rabbit hole
-crying and gryphon danced: NPMI 1, passages [0, 4, 8, 12, 16, 20]
+hatter, march hare, dormouse
+gryphon, mock turtle, caterpillar
+queen, knave
+hatter and march hare: NPMI 0.333, passages [0, 4, 8]
 ```
 
 ## Input

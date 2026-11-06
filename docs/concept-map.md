@@ -2,21 +2,22 @@
 
 A concept map shows a text before you know what to search for in it: which subjects the text keeps returning to, which of them it treats together, and where in the text each one appears. It is built from the text's passages alone, without an outline, a model or training data, in seconds.
 
-A concept is a phrase from the text, such as "march hare" or "transcendental realism". Two concepts are linked when they stand in the same passages more often than chance predicts. Linked concepts fall into communities. Every concept and every link carries the ids of its passages, so each one can be checked against the text.
+A concept is a phrase from the text, such as "cat" or "transcendental realism". Two concepts are linked when they stand in the same passages more often than chance predicts, but not nearly always: a pair that nearly always stands together is dropped as too strongly linked. Linked concepts fall into communities. Every concept and every link carries the ids of its passages, so each one can be checked against the text.
 
 This document explains what `build` computes and why. Each step of `build` rests on an idea from text mining, linear algebra, information theory or graph theory, so the document explains that idea first, as far as the code needs it, and then works the step through a small example. The [references](#references) say where to read further on each idea.
 
 ## Overview
 
-`build` in `src/lib.rs` turns the passages into a graph in five steps.
+`build` in `src/lib.rs` turns the passages into a graph in five steps, and step 4 sends back to step 3 the concepts it finds too strongly linked.
 
 ```mermaid
 flowchart TD
     P["Passages<br/>in reading order"] --> C["1. Candidate phrases<br/>RAKE cuts, SMART stopwords<br/>in 3 passages or more, 30% at most"]
     P --> T["2. Topics<br/>TF-IDF, NMF of rank round(√n)"]
-    C --> S["3. Concepts<br/>the 60 candidates with the most<br/>mutual information with the topics"]
+    C --> S["3. Concepts<br/>the 60 candidates with the most<br/>mutual information with the topics,<br/>none linked at NPMI 0.5 or more"]
     T --> S
     S --> L["4. Links<br/>NPMI above 0.1, 2 shared passages or more,<br/>3 best partners per concept"]
+    L -->|"both ends of a link at NPMI 0.5 or more<br/>are dropped, the next candidates fill in"| S
     L --> M["5. Communities<br/>Louvain on the NPMI weights"]
     M --> G["GraphResult"]
 ```
@@ -27,19 +28,19 @@ Below, n is the number of passages. `build` refuses fewer than `GRAPH_MIN_BOOK_P
 
 The worked examples use the Project Gutenberg EPUB of Lewis Carroll's *Alice's Adventures in Wonderland*, cut into 166 passages of whole paragraphs of at most 220 words, with the chapter headings left out. Steps 2 and 3 add a toy text of six passages, small enough to show every number.
 
-The whole graph of *Alice*, drawn by `to_dot` as [Drawing the map](#drawing-the-map) describes, holds the concepts, links and communities that the examples below take apart. Each colour is a community, a circle grows with its concept's passages, and a line thickens with its NPMI. The trial, the tea party, the Gryphon and the Mock Turtle, and the Caterpillar each gather into a community, and the three communities at the top come from the Project Gutenberg licence that the book carries, as [Limits](#limits) explains.
+The whole graph of *Alice*, drawn by `to_dot` as [Drawing the map](#drawing-the-map) describes, holds the concepts, links and communities that the examples below take apart. Each colour is a community, a circle grows with its concept's passages, and a line thickens with its NPMI. The map holds ordinary words of the story, such as "head", "looked", "cat" and "voice", because the characters and the licence's phrases stand together too strongly to stay, as [Limits](#limits) explains.
 
 ![The concept map of Alice's Adventures in Wonderland](alice.png)
 
 ### One phrase through the five steps
 
-The phrase "march hare" shows what each step contributes before the sections below explain how.
+The phrase "cat" shows what each step contributes before the sections below explain how.
 
-1. **Candidate phrases.** In "“Have some wine,” the March Hare said in an encouraging tone.", the words "the" and "said" are stopwords, so step 1 cuts "march hare" out of the sentence as a phrase. It stands as a phrase of its own in 17 of the 166 passages, often enough to recur and rarely enough to mark one part of the book, so it is one of 581 candidates.
-2. **Topics.** Independently of step 1, step 2 sorts the 166 passages into 13 topics by the words they use. One topic holds 13 passages whose heaviest words are the stems "hatter", "dormous", "march", "hare" and "tea": the tea party.
-3. **Concepts.** 12 of the 17 passages of "march hare" lie in that topic, so whether a passage holds the phrase and which topic it is in go together. Measured by their mutual information, "march hare" ranks 8th of the 581 candidates, so it is one of the 60 concepts.
-4. **Links.** "march hare" and "hatter" share 16 passages, where chance predicts fewer than 2. Their NPMI is 0.924, so they are linked.
-5. **Communities.** The links among "time", "hatter", "march hare" and "dormouse" carry more weight than the four concepts' links to the rest predict, so they form a community.
+1. **Candidate phrases.** In "(Dinah was the cat.)", the words "was" and "the" are stopwords, so step 1 cuts "dinah" and "cat" out of the sentence as phrases of their own. "cat" stands as a phrase of its own in 14 of the 166 passages, often enough to recur and rarely enough to mark one part of the book, so it is one of 581 candidates.
+2. **Topics.** Independently of step 1, step 2 sorts the 166 passages into 13 topics by the words they use.
+3. **Concepts.** 7 of the 14 passages of "cat" lie in one topic, which holds 16 passages, so whether a passage holds the phrase and which topic it is in go together. Measured by their mutual information, "cat" ranks 24th of the 581 candidates, among the best 60.
+4. **Links.** Of the 60 best candidates, 43 are linked to another of them at an NPMI of 0.5 or more and are dropped, "hatter" and "march hare" among them, which share 16 passages at an NPMI of 0.924. "cat" is not one of them: its strongest link, to "timidly", has an NPMI of 0.342. The dropped concepts' places go to the next best candidates, which are checked in turn, and after 10 rounds 60 concepts remain. "cat" is linked to 7 of them.
+5. **Communities.** The links among "cat", "talking", "made", "cried", "sat", "pool", "pardon" and "birds" carry more weight than the eight concepts' links to the rest predict, so they form a community.
 
 ## Words, tokens and stems
 
@@ -222,7 +223,7 @@ Topic 0 is the tea party, with tea, dormous and hatter; topic 1 is the croquet g
 
 ## Step 3: choosing concepts
 
-`select` in `src/lib.rs` keeps the candidates that best predict a passage's topic. It measures how well a candidate predicts the topic by mutual information, which rests on entropy.
+`select` in `src/lib.rs` keeps the candidates that best predict a passage's topic, as long as they are not too strongly linked to each other. It measures how well a candidate predicts the topic by mutual information, which rests on entropy. The second condition rests on the NPMI of [step 4](#step-4-links), so it is worked out there.
 
 ### Entropy
 
@@ -276,9 +277,9 @@ The unit test pins the two extremes for four passages in topics 0, 0, 1, 1. A ph
 
 The score is high for a phrase whose passages fall in few topics. The bound $\mathrm{H}(G)$ makes it low for a phrase in few passages, however concentrated: a phrase in 3 of the 166 passages can score at most 0.090. "serpent" stands in 3 passages, all in topic 9, which holds only 4, and scores 0.0769.
 
-The `GRAPH_CONCEPTS` = 60 highest scores become the concepts, ties going to the phrase in more passages, then to the lower key. In *Alice* the highest are "king" (0.258), "queen" (0.255) and "hatter" (0.245), and "march hare" ranks 8th. The 60th, "shouted", scores 0.079992. Below the cut, "thing", in 38 passages, scores 0.079985 and ranks 61st, and "serpent" ranks 63rd.
+The `GRAPH_CONCEPTS` = 60 highest scores are taken, ties going to the phrase in more passages, then to the lower key. In *Alice* the highest are "king" (0.258), "queen" (0.255) and "hatter" (0.245), and "march hare" ranks 8th. Step 4 then drops the strongly linked among them and sends back for more, so the concepts that remain are those of [Dropping strongly linked pairs](#dropping-strongly-linked-pairs): in *Alice* none of these four stays, and the 60th concept ranks 169th by this score, "birds" with 0.0527.
 
-The concepts are then sorted by their first passage, ties by label, and numbered from 0 in that order.
+The surviving concepts are sorted by their first passage, ties by label, and numbered from 0 in that order.
 
 ## Step 4: links
 
@@ -314,7 +315,7 @@ which `npmi` computes. Its values lie between −1 and 1, with fixed meanings:
 
 The unit test pins two values: `npmi(2, 2, 2, 10)` is 1 and `npmi(4, 5, 2, 10)` is 0.
 
-**A pair of concepts.** In *Alice*, "hatter" stands in 18 passages and "march hare" in 17:
+**A pair of concepts.** In *Alice*, the candidates "hatter" and "march hare" stand in 18 and 17 passages:
 
 | | march hare | no march hare | all |
 |---|---|---|---|
@@ -326,13 +327,23 @@ Independence predicts 18 × 17 / 166 = 1.84 shared passages; they share 16, 8.68
 
 $$\frac{\ln (16 \cdot 166 / (18 \cdot 17))}{\ln (166 / 16)} = \frac{\ln 8.68}{\ln 10.38} = \frac{2.161}{2.339} = 0.924$$
 
-The two concepts in 3 passages each that share 2 have a PMI of 3.61, above the 2.16 of "hatter" and "march hare", but an NPMI of 0.82, below their 0.92.
+The two concepts in 3 passages each that share 2 have a PMI of 3.61, above the 2.16 of "hatter" and "march hare", but an NPMI of 0.82, below their 0.92. An NPMI that high is the sign of a pair that is too strongly linked, as the next section explains.
+
+### Dropping strongly linked pairs
+
+An NPMI near 1 says that two phrases nearly always stand in the same passages, so they mark one stretch of the text and not two subjects. A character and its title, the words of a publisher's address and the three pieces of "www.gutenberg.org" do this. Such a pair is also the most structured part of a map, with the strongest links and little else, and it can fill the map: of the 60 best candidates of *Alice*, 43 stand in a pair like that.
+
+`GRAPH_NPMI_CEILING` = 0.5 sets the limit. Two concepts that share at least `GRAPH_MIN_SHARED` = 2 passages and have an NPMI of at least 0.5 are too strongly linked, and `select` drops both. It then takes the next best candidates by mutual information to bring the number back to 60 and checks all the concepts again, since a new one can be too strongly linked to an old one. A dropped phrase never comes back. The rounds end when no pair is too strongly linked, or when the candidates run out, so a text can end with fewer than 60 concepts.
+
+The pair "hatter" and "march hare" share 16 passages at an NPMI of 0.924, so both go in the first round. Of the first 60 concepts of *Alice*, 43 go in round 1, then 28, 13, 9, 6, 4, 2, 2 and 2 in the rounds after it, 109 in all, and round 10 finds none. The 60 concepts then reach down to rank 169. Among those dropped are "king" and "queen", which share 16 passages at 0.595, and "mock turtle" and "gryphon", which share 13 at 0.838.
+
+No link of the finished map is at the ceiling, and all are above the floor of 0.1, which is why the links are moderate: the strongest of *Alice* has an NPMI of 0.487.
 
 ### Which pairs become links
 
-Each concept keeps up to `GRAPH_PARTNERS` = 3 partners. The partners it can keep are the concepts that share at least `GRAPH_MIN_SHARED` = 2 passages with it and have an NPMI above `GRAPH_NPMI_FLOOR` = 0.1; it keeps those with the highest NPMI, ties going to the lower id. A link exists when either concept keeps the other.
+Each concept keeps up to `GRAPH_PARTNERS` = 3 partners. The partners it can keep are the concepts that share at least `GRAPH_MIN_SHARED` = 2 passages with it and have an NPMI above `GRAPH_NPMI_FLOOR` = 0.1; the ceiling has already seen to it that none is at 0.5 or more. It keeps those with the highest NPMI, ties going to the lower id. A link exists when either concept keeps the other.
 
-Seven concepts qualify as partners of "march hare", with NPMI from 0.924 for "hatter" down to 0.168 for "time"; of these it keeps the three highest, "hatter" (0.924), "dormouse" (0.718) and "majesty" (0.244). "time", in 47 passages, keeps "found" (0.177), "march hare" (0.168) and "hatter" (0.149). So "time" and "march hare" are linked, although "time" is only the seventh choice of "march hare". A concept that many others keep can therefore have more than three links ("king" has eight), and a concept that keeps no partner and is kept by none has no link. *Alice* has 123 links among its 60 concepts.
+Seven concepts are linked to "cat": "timidly" (0.342), "felt" (0.328), "pardon" and "birds" (0.311 each), "pool" (0.276), "talking" (0.247) and "speak" (0.232). "cat" keeps its three best partners at most, so the others are linked to it because they keep it. A concept that many others keep can therefore have more than three links ("cat" has seven), and a concept that keeps no partner and is kept by none has no link: "displaying" and "including" have none. *Alice* has 111 links among its 60 concepts.
 
 The share limit of step 1 keeps the formula defined. Both concepts stand in at most 0.3n passages, so s is at most 0.3n and the denominator is at least ln(1/0.3) = 1.204, never 0. One shared passage would be enough to keep the logarithms finite, but the code asks for 2.
 
@@ -418,7 +429,7 @@ Phase 1 then runs on the smaller graph, where moving a node moves a whole commun
 
 A concept without links stays a community of its own, so a graph without links has one community per concept.
 
-`build` orders the communities largest first, ties going to the community whose first concept the text mentions earlier, and numbers them in that order. *Alice* has 8 communities. "time", "hatter", "march hare" and "dormouse" form one, and "mock turtle" and "gryphon" are in another.
+`build` orders the communities largest first, ties going to the community whose first concept the text mentions earlier, and numbers them in that order. *Alice* has 9 communities, of 12, 11, 11, 8, 7, 5, 4, 1 and 1 concepts. "cat", "talking", "made", "cried", "sat", "pool", "pardon" and "birds" form the fourth, and "displaying" and "including", which have no links, are communities of their own.
 
 ## What the graph reads
 
@@ -458,9 +469,11 @@ Phrases. A concept is named in the text's own words and backed by the passages t
 
 Topics. Frequency alone favours phrases spread evenly through a text, while mutual information with the topics favours phrases that tell its parts apart: of two phrases in the same number of passages, the one whose passages fall in fewer topics scores higher. The share limits remove what is everywhere before either count is made.
 
-NPMI rather than shared counts. The number of passages two concepts share grows with how common each of them is. In *Alice*, "time" stands in 47 passages and shares 8 with "hatter", half as many as "march hare" shares with it. Yet chance alone predicts 47 · 18 / 166 ≈ 5.1 shared passages for "time", so its NPMI with "hatter" is 0.149 against 0.924 for "march hare". Plain PMI errs the other way: it favours rare pairs, as step 4 shows. Dividing by −ln p(a,b) bounds the score between −1 and 1 with fixed meanings at −1, 0 and 1 (Bouma 2009), so one floor of 0.1 serves every pair in every text.
+NPMI rather than shared counts. The number of passages two concepts share grows with how common each of them is. In *Alice*, "time" stands in 47 passages and shares 8 with "hatter", half as many as "march hare" shares with it. Yet chance alone predicts 47 · 18 / 166 ≈ 5.1 shared passages for "time", so its NPMI with "hatter" is 0.149 against 0.924 for "march hare" (all three are candidates). Plain PMI errs the other way: it favours rare pairs, as step 4 shows. Dividing by −ln p(a,b) bounds the score between −1 and 1 with fixed meanings at −1, 0 and 1 (Bouma 2009), so one floor of 0.1 serves every pair in every text.
 
-Communities. Modularity measures how linked a set of concepts is against what the concepts' degrees alone predict, so a concept with many links does not draw every concept it touches into its community. In *Alice*, "queen" is linked to "shouted" and "duchess", yet both belong to other communities, and "hatter" is linked to "court" but stays with "march hare", "dormouse" and "time".
+Communities. Modularity measures how linked a set of concepts is against what the concepts' degrees alone predict, so a concept with many links does not draw every concept it touches into its community. In *Alice*, "cat" is linked to "timidly", "felt" and "speak", yet all three belong to other communities, and "cat" stays with "talking", "pool", "pardon" and "birds".
+
+The ceiling. A pair that nearly always stands together is one stretch of the text counted twice, so it adds a structure to the map and no further subject. Dropping both phrases leaves room for concepts that tell the parts of the text apart without being tied to one phrase, and it makes every link a moderate one, so that the picture shows how subjects overlap and not which phrases are copies of each other. The price is in [Limits](#limits).
 
 Determinism. The same passages give the same graph on every machine, because the NMF start comes from a fixed seed, the matrix columns are in word order, Louvain visits nodes in index order, and every sort breaks ties by count, id or key.
 
@@ -468,6 +481,7 @@ Determinism. The same passages give the same graph on every machine, because the
 
 - The input needs at least 20 passages.
 - A graph has at most 60 concepts, however long the text. In a long text more subjects compete for the 60 places, so a subject whose phrases score lower is left out however often it occurs.
+- A phrase whose passages nearly always hold another phrase is dropped with it, however well it marks a topic. The characters of a story do this: in *Alice* the king, the queen, the hatter, the march hare, the dormouse, the gryphon and the mock turtle are all dropped, because each stands with a few others, and the map keeps ordinary words such as "head", "looked" and "voice" instead. A text that is mostly one structured subject can end with fewer than 60 concepts.
 - The method is for English: the SMART stopwords, Lucene's stopwords, the question words and the stemmer are English.
 - A phrase is any run of up to three content words, not a noun phrase. In *Alice* "thought alice" is a concept, because "said" is a SMART stopword and "thought" is not.
 - A name that holds a stopword, a digit or a word of fewer than three letters is split or lost: "queen of hearts" gives "queen" and "hearts". A run of more than three content words gives nothing.
@@ -477,7 +491,7 @@ Determinism. The same passages give the same graph on every machine, because the
 - A link says only that two concepts share passages more often than chance predicts. It has no direction or kind. A passage counts as one place, whatever the distance between the two inside it.
 - Each passage belongs to exactly one topic. The number of topics is fixed at √n rounded. The concepts are chosen by these topics, so a different factorization would choose different concepts.
 - Louvain returns a local optimum of modularity, the one its fixed visiting order reaches.
-- Apparatus counts like text. The Project Gutenberg header and licence of *Alice* (passage 0 and passages 149 to 165) form a topic of their own and give concepts such as "project gutenberg", "electronic works", "www", "gutenberg" and "org". Three of the eight communities consist mostly of these concepts. "www", "gutenberg" and "org" are linked with an NPMI of 1, because the dots of www.gutenberg.org cut it into three phrases that always stand together.
+- Apparatus counts like text. The Project Gutenberg header and licence of *Alice* (passage 0 and passages 149 to 165) form a topic of their own. Their phrases stand together so strongly that most are dropped, "www", "gutenberg" and "org" among them, since the dots of www.gutenberg.org cut it into three phrases that always stand together and so have an NPMI of 1. A few survive: "displaying" and "including" are in the map, each as a community of its own without a link.
 
 ## References
 
